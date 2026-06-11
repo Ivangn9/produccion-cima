@@ -3,13 +3,14 @@
   "short_name": "Producción CIMA",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#06091a",
+  "background_color": "#ffffff",
   "theme_color": "#06091a",
   "icons": [
     {
-      "src": "Logocima.jpg",
-      "sizes": "any",
-      "type": "image/jpeg"
+      "src": "apple-touch-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
