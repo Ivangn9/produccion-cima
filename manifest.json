@@ -1,0 +1,15 @@
+{
+  "name": "Producción CIMA",
+  "short_name": "Producción CIMA",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#06091a",
+  "theme_color": "#06091a",
+  "icons": [
+    {
+      "src": "Logocima.jpg",
+      "sizes": "any",
+      "type": "image/jpeg"
+    }
+  ]
+}
