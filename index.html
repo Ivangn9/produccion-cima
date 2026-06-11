@@ -1,13 +1,19 @@
 <!DOCTYPE html>
-<!-- v1.0.0 -->
+<!-- v1.0.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="app-version" content="v1.0.0">
+<meta name="app-version" content="v1.0.2">
 <title>Producción CIMA · Control de Producción</title>
+<link rel="preconnect" href="https://www.gstatic.com">
+<link rel="preconnect" href="https://cdn.sheetjs.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="apple-touch-icon.png">
 <link rel="apple-touch-icon" sizes="512x512" href="apple-touch-icon.png">
@@ -428,7 +434,7 @@ input,select,textarea{font-family:inherit;color:var(--text);}
 <body>
 <!-- ═══ Boot loader ═══ -->
 <div id="bootLoader">
-  <img src="Logocima.jpg" alt="CIMA">
+  <img src="logo.png" alt="CIMA">
   <div class="spin-ring"></div>
   <div>Cargando Control de Producción…</div>
 </div>
@@ -436,7 +442,7 @@ input,select,textarea{font-family:inherit;color:var(--text);}
 <!-- ═══ Login ═══ -->
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card gc">
-    <div class="login-logo-wrap"><img src="Logocima.jpg" alt="CIMA" class="login-logo"></div>
+    <div class="login-logo-wrap"><img src="logo.png" alt="CIMA" class="login-logo"></div>
     <div class="login-title">Control de Producción</div>
     <div class="login-sub">CIMA · Diagnóstico por Imágenes y Consultorios<br>Acceso exclusivo para personal autorizado</div>
     <button class="btn-google" id="loginBtn" onclick="signIn()">
@@ -454,7 +460,7 @@ input,select,textarea{font-family:inherit;color:var(--text);}
 <div id="app" class="hidden">
   <div id="header"><div id="header-inner">
     <div id="header-left">
-      <img src="Logocima.jpg" alt="CIMA" id="logo-img">
+      <img src="logo.png" alt="CIMA" id="logo-img">
       <div style="display:flex;flex-direction:column;gap:2px;">
         <div class="hdr-app-name">Control de Producción</div>
         <div class="hdr-app-sub">Diagnóstico por Imágenes · Consultorios</div>
@@ -732,8 +738,8 @@ input,select,textarea{font-family:inherit;color:var(--text);}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 <script>
 "use strict";
 /* ═══════════════════════════════════════════
@@ -742,8 +748,8 @@ input,select,textarea{font-family:inherit;color:var(--text);}
    meta app-version y el comentario <!-- vX.Y.Z --> de la línea 2.
    ═══════════════════════════════════════════ */
 var APP_VERSION=(document.querySelector('meta[name="app-version"]')||{}).content||"";
-var APP_DISPLAY_VERSION="1.0.0";
-var APP_BUILD="11/06/26 16:30";
+var APP_DISPLAY_VERSION="1.0.2";
+var APP_BUILD="11/06/26 19:00";
 function doUpdate(){
   toast("⚡ Actualizando...");
   setTimeout(function(){
@@ -789,6 +795,16 @@ if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
 var _auth=firebase.auth();
 var _db=firebase.firestore();
 try{_db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){}
+// Persistencia de sesión explícita: la sesión de Google queda guardada en el
+// dispositivo y no se vuelve a pedir login en cada apertura
+try{_auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});}catch(e){}
+// Pedir almacenamiento persistente: evita que iOS/Safari borre IndexedDB
+// (sesión de Google + caché offline de Firestore) por inactividad
+try{
+  if(navigator.storage&&navigator.storage.persist){
+    navigator.storage.persist().catch(function(){});
+  }
+}catch(e){}
 
 var ADMIN_EMAIL="ivangarcian@gmail.com";
 var DB_DATA="produccion_cima";
@@ -855,10 +871,19 @@ $("confirmOkBtn").addEventListener("click",function(){
 /* ═══════════════════════════════════════════
    AUTH + CONTROL DE ACCESOS
    ═══════════════════════════════════════════ */
+var _isIosPwa=!!navigator.standalone||window.matchMedia("(display-mode:standalone)").matches;
 function signIn(){
   var p=new firebase.auth.GoogleAuthProvider();
-  _auth.signInWithPopup(p).catch(function(e){toast("⚠️ Error al iniciar sesión: "+e.message);});
+  // En iOS PWA standalone, Safari bloquea popups y cookies de terceros (ITP).
+  // signInWithRedirect navega en la misma pestaña, evitando ambos problemas.
+  if(_isIosPwa){
+    _auth.signInWithRedirect(p).catch(function(e){toast("⚠️ Error al iniciar sesión: "+e.message);});
+  }else{
+    _auth.signInWithPopup(p).catch(function(e){toast("⚠️ Error al iniciar sesión: "+e.message);});
+  }
 }
+// Procesar resultado del redirect (solo aplica en iOS PWA tras volver de Google)
+_auth.getRedirectResult().catch(function(){});
 function signOut(){
   _auth.signOut();
   _stopListeners();
@@ -1133,7 +1158,12 @@ function setView(v){
    DASHBOARD
    ═══════════════════════════════════════════ */
 var _charts={};
-function mkChart(canvasId,cfg){
+function mkChart(canvasId,cfg,_attempt){
+  if(typeof Chart==="undefined"){
+    if((_attempt||0)>=8){toast("⚠️ No se pudo cargar Chart.js — revisá la conexión");return;}
+    setTimeout(function(){mkChart(canvasId,cfg,(_attempt||0)+1);},300);
+    return;
+  }
   if(_charts[canvasId]){_charts[canvasId].destroy();delete _charts[canvasId];}
   var cv=$(canvasId);if(!cv)return;
   cfg.options=cfg.options||{};
@@ -1242,7 +1272,7 @@ var IMPORT_FIELDS=[
   {id:"fecha",label:"Fecha / Mes",req:false,keys:["fecha","fecha_estudio","fecha_realizacion","fecha_turno","dia","mes","periodo"]},
   {id:"anio",label:"Año (si Mes es número)",req:false,keys:["año","anio","ano","year","ejercicio"]}
 ];
-var _wb=null,_fileName="",_headers=[],_rows=[],_pendingAgg=null;
+var _wb=null,_fileName="",_headers=[],_rows=[],_pendingAgg=null,_fileLoading=false;
 
 (function initDropzone(){
   var dz=$("dropzone");
@@ -1266,7 +1296,14 @@ var _wb=null,_fileName="",_headers=[],_rows=[],_pendingAgg=null;
   mesSel.value=String(prevMonth);anioSel.value=String(prevYear);
 })();
 
-function handleFile(file){
+function handleFile(file,_attempt){
+  _fileLoading=true;
+  if(typeof XLSX==="undefined"){
+    if((_attempt||0)===0)toast("⏳ Preparando el lector de Excel…");
+    if((_attempt||0)>=8){_fileLoading=false;toast("⚠️ No se pudo cargar SheetJS — revisá la conexión");return;}
+    setTimeout(function(){handleFile(file,(_attempt||0)+1);},400);
+    return;
+  }
   _fileName=file.name;
   var reader=new FileReader();
   reader.onload=function(e){
@@ -1283,8 +1320,9 @@ function handleFile(file){
     $("importResult").classList.add("hidden");
     selectSheet(names[0]);
   };
-  reader.onerror=function(){toast("⚠️ Error leyendo el archivo");};
+  reader.onerror=function(){_fileLoading=false;toast("⚠️ Error leyendo el archivo");};
   reader.readAsArrayBuffer(file);
+  _fileLoading=false;
 }
 function selectSheet(name){
   var ws=_wb.Sheets[name];
@@ -1692,7 +1730,13 @@ function clampNum(id,def){
   return (isNaN(v)||v<1)?def:Math.min(v,60);
 }
 
-function generarInforme(){
+function generarInforme(_attempt){
+  if(typeof Chart==="undefined"){
+    if((_attempt||0)===0)toast("⏳ Preparando gráficos…");
+    if((_attempt||0)>=8){toast("⚠️ No se pudo cargar Chart.js — revisá la conexión");return;}
+    setTimeout(function(){generarInforme((_attempt||0)+1);},400);
+    return;
+  }
   var selP=getChecked("listPeriods").sort();
   if(!selP.length){toast("⚠️ Elegí al menos un período");return;}
   var selS=getChecked("listServicios");
