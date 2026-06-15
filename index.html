@@ -1387,20 +1387,25 @@ function handleFile(file,_attempt){
     return;
   }
   _fileName=file.name;
+  var sizeMB=(file.size/1048576).toFixed(0);
   var reader=new FileReader();
   reader.onload=function(e){
-    try{
-      _wb=XLSX.read(e.target.result,{type:"array",cellDates:true});
-    }catch(err){toast("⚠️ No se pudo leer el archivo: "+err.message);return;}
-    var names=_wb.SheetNames||[];
-    if(!names.length){toast("⚠️ El archivo no tiene hojas");return;}
-    var wrap=$("sheetPickWrap"),pick=$("sheetPick");
-    if(names.length>1){
-      var o="";names.forEach(function(n){o+='<option value="'+escAttr(n)+'">'+escHtml(n)+'</option>';});
-      pick.innerHTML=o;wrap.classList.remove("hidden");
-    }else wrap.classList.add("hidden");
-    $("importResult").classList.add("hidden");
-    selectSheet(names[0]);
+    var buf=e.target.result;
+    toast("⏳ Leyendo archivo ("+sizeMB+" MB)… puede tardar unos segundos");
+    setTimeout(function(){
+      try{
+        _wb=XLSX.read(buf,{type:"array",cellDates:true});
+      }catch(err){toast("⚠️ No se pudo leer el archivo: "+err.message);return;}
+      var names=_wb.SheetNames||[];
+      if(!names.length){toast("⚠️ El archivo no tiene hojas");return;}
+      var wrap=$("sheetPickWrap"),pick=$("sheetPick");
+      if(names.length>1){
+        var o="";names.forEach(function(n){o+='<option value="'+escAttr(n)+'">'+escHtml(n)+'</option>';});
+        pick.innerHTML=o;wrap.classList.remove("hidden");
+      }else wrap.classList.add("hidden");
+      $("importResult").classList.add("hidden");
+      selectSheet(names[0]);
+    },80);
   };
   reader.onerror=function(){_fileLoading=false;toast("⚠️ Error leyendo el archivo");};
   reader.readAsArrayBuffer(file);
