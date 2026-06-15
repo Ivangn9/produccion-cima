@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<!-- v1.0.4 -->
+<!-- v1.0.5 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="app-version" content="v1.0.4">
+<meta name="app-version" content="v1.0.5">
 <title>Producción CIMA · Control de Producción</title>
 <link rel="preconnect" href="https://www.gstatic.com">
 <link rel="preconnect" href="https://cdn.sheetjs.com">
@@ -618,11 +618,23 @@ input,select,textarea{font-family:inherit;color:var(--text);}
           </div>
           <div style="font-size:11.5px;color:var(--text3);max-width:320px;padding-bottom:10px;" id="periodFallbackNote">Si mapeás una columna de Fecha, el período se detecta solo (y un archivo puede abarcar varios meses).</div>
         </div>
+        <div style="margin:14px 0 0;" id="cadaFilaWrap">
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="cadaFilaUno" style="width:18px;height:18px;cursor:pointer;">
+            <span>Contar cada fila como 1 estudio <span style="color:var(--text3)">(ignorar columna Cantidad — usá esto si la columna siempre vale 0)</span></span>
+          </label>
+        </div>
         <label class="field-label" style="margin-top:16px;">Vista previa</label>
         <div class="preview-scroll" id="previewTable"></div>
-        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+        <div id="importProgress" class="hidden" style="margin-top:14px;">
+          <div style="font-size:12px;color:var(--text3);margin-bottom:6px;" id="importProgressText">Procesando…</div>
+          <div style="background:var(--surface2);border-radius:6px;height:8px;overflow:hidden;">
+            <div id="importProgressBar" style="height:100%;background:var(--accent);border-radius:6px;width:0%;transition:width .15s;"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;" id="importActionBtns">
           <button class="btn btn-secondary" onclick="cancelImport()">Cancelar</button>
-          <button class="btn btn-primary" onclick="procesarImport()">Procesar datos →</button>
+          <button class="btn btn-primary" id="btnProcesar" onclick="procesarImport()">Procesar datos →</button>
         </div>
       </div>
 
@@ -818,8 +830,8 @@ input,select,textarea{font-family:inherit;color:var(--text);}
    meta app-version y el comentario <!-- vX.Y.Z --> de la línea 2.
    ═══════════════════════════════════════════ */
 var APP_VERSION=(document.querySelector('meta[name="app-version"]')||{}).content||"";
-var APP_DISPLAY_VERSION="1.0.4";
-var APP_BUILD="14/06/26 17:30";
+var APP_DISPLAY_VERSION="1.0.5";
+var APP_BUILD="15/06/26 10:00";
 function doUpdate(){
   toast("⚡ Actualizando...");
   setTimeout(function(){
@@ -1497,6 +1509,11 @@ function rowPeriod(v,anioV,fallback){
       if(!y)y=new Date().getFullYear();
       return y+"-"+("0"+v).slice(-2);
     }
+    // YYYYMM compacto (ej: 202304 → "2023-04")
+    if(v>=190001&&v<=210012){
+      var ym=Math.round(v),yy=Math.floor(ym/100),mm=ym%100;
+      if(mm>=1&&mm<=12)return yy+"-"+("0"+mm).slice(-2);
+    }
     if(v>25000&&v<60000){ // serial Excel
       var d=new Date(Math.round((v-25569)*86400*1000));
       if(!isNaN(d))return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2);
@@ -1529,51 +1546,77 @@ function rowPeriod(v,anioV,fallback){
 function procesarImport(){
   var map=getMapping();
   if(map.servicio<0){toast("⚠️ Tenés que mapear la columna Servicio");return;}
+  var cadaFilaUno=!!($("cadaFilaUno")&&$("cadaFilaUno").checked);
   var fallback=$("impAnio").value+"-"+("0"+$("impMes").value).slice(-2);
-  var byPeriod={},skipped=0;
-  for(var r=0;r<_rows.length;r++){
-    var row=_rows[r];
-    var serv=row[map.servicio];
-    if(serv==null||String(serv).trim()===""){skipped++;continue;}
-    serv=String(serv).trim();
-    var qty=1;
-    if(map.cantidad>=0){
-      var qv=parseFloat(String(row[map.cantidad]).replace(",","."));
-      qty=isNaN(qv)?1:qv;
+  var byPeriod={};
+  var skipped=0;
+  var r=0;
+  var CHUNK=3000;
+
+  $("importProgress").classList.remove("hidden");
+  $("importProgressBar").style.width="0%";
+  $("importProgressText").textContent="Preparando…";
+  $("btnProcesar").disabled=true;
+
+  function step(){
+    var end=Math.min(r+CHUNK,_rows.length);
+    while(r<end){
+      var row=_rows[r++];
+      var serv=row[map.servicio];
+      if(serv==null||String(serv).trim()===""){skipped++;continue;}
+      serv=String(serv).trim();
+      var qty=1;
+      if(!cadaFilaUno&&map.cantidad>=0){
+        var qv=parseFloat(String(row[map.cantidad]).replace(",","."));
+        if(!isNaN(qv)&&qv>0)qty=qv;
+      }
+      var period=map.fecha>=0?rowPeriod(row[map.fecha],map.anio>=0?row[map.anio]:null,fallback):fallback;
+      if(!period){skipped++;continue;}
+      if(!byPeriod[period]){
+        byPeriod[period]={total:0,rows:0,serv:{},centros:{},servCentro:{},obras:{},pract:{},deriv:{},equip:{}};
+      }
+      var agg=byPeriod[period];
+      agg.total+=qty;agg.rows++;
+      sumInto(agg.serv,serv,qty);
+      var centro=map.centro>=0?String(row[map.centro]||"").trim():"";
+      if(centro){
+        sumInto(agg.centros,centro,qty);
+        sumInto(agg.servCentro,serv+" ||| "+centro,qty);
+      }
+      if(map.obra>=0){
+        var os=String(row[map.obra]||"").trim();
+        if(os)sumInto(agg.obras,os,qty);
+      }
+      if(map.practica>=0){
+        var pr=String(row[map.practica]||"").trim();
+        if(pr)sumInto(agg.pract,serv+" ||| "+pr,qty);
+      }
+      if(map.derivante>=0){
+        var de=String(row[map.derivante]||"").trim();
+        if(de)sumInto(agg.deriv,serv+" ||| "+de,qty);
+      }
+      if(map.equipo>=0){
+        var eq=String(row[map.equipo]||"").trim();
+        if(eq)sumInto(agg.equip,serv+" ||| "+eq,qty);
+      }
     }
-    if(!qty)continue;
-    var period=map.fecha>=0?rowPeriod(row[map.fecha],map.anio>=0?row[map.anio]:null,fallback):fallback;
-    if(!period){skipped++;continue;}
-    if(!byPeriod[period]){
-      byPeriod[period]={total:0,rows:0,serv:{},centros:{},servCentro:{},obras:{},pract:{},deriv:{},equip:{}};
-    }
-    var agg=byPeriod[period];
-    agg.total+=qty;agg.rows++;
-    sumInto(agg.serv,serv,qty);
-    var centro=map.centro>=0?String(row[map.centro]||"").trim():"";
-    if(centro){
-      sumInto(agg.centros,centro,qty);
-      sumInto(agg.servCentro,serv+" ||| "+centro,qty);
-    }
-    if(map.obra>=0){
-      var os=String(row[map.obra]||"").trim();
-      if(os)sumInto(agg.obras,os,qty);
-    }
-    if(map.practica>=0){
-      var pr=String(row[map.practica]||"").trim();
-      if(pr)sumInto(agg.pract,serv+" ||| "+pr,qty);
-    }
-    if(map.derivante>=0){
-      var de=String(row[map.derivante]||"").trim();
-      if(de)sumInto(agg.deriv,serv+" ||| "+de,qty);
-    }
-    if(map.equipo>=0){
-      var eq=String(row[map.equipo]||"").trim();
-      if(eq)sumInto(agg.equip,serv+" ||| "+eq,qty);
+    var pct=_rows.length?Math.round(r/_rows.length*100):100;
+    $("importProgressBar").style.width=pct+"%";
+    $("importProgressText").textContent="Procesando "+fmtN(r)+" / "+fmtN(_rows.length)+" filas…";
+    if(r<_rows.length){
+      setTimeout(step,0);
+    } else {
+      $("importProgress").classList.add("hidden");
+      $("btnProcesar").disabled=false;
+      finalizarImport(byPeriod,skipped);
     }
   }
+  setTimeout(step,50);
+}
+
+function finalizarImport(byPeriod,skipped){
   var periods=Object.keys(byPeriod).sort();
-  if(!periods.length){toast("⚠️ No se pudo procesar ninguna fila");return;}
+  if(!periods.length){toast("⚠️ No se pudo procesar ninguna fila — verificá el mapeo de columnas");return;}
 
   _pendingAgg={};
   periods.forEach(function(p){
@@ -1603,7 +1646,6 @@ function procesarImport(){
     };
   });
 
-  // Resumen
   var totRows=0,totQty=0,allServ={},allObras={};
   periods.forEach(function(p){
     totRows+=_pendingAgg[p].meta.rows;totQty+=_pendingAgg[p].total;
