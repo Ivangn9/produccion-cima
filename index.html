@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<!-- v1.0.6 -->
+<!-- v1.0.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="app-version" content="v1.0.6">
+<meta name="app-version" content="v1.0.7">
 <title>Producción CIMA · Control de Producción</title>
 <link rel="preconnect" href="https://www.gstatic.com">
 <link rel="preconnect" href="https://cdn.sheetjs.com">
@@ -294,6 +294,19 @@ input,select,textarea{font-family:inherit;color:var(--text);}
   -webkit-tap-highlight-color:transparent;
 }
 .chip-btn:active{background:rgba(0,113,227,.16);}
+.chip-btn.chip-on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.chip-btn.chip-on:active{background:#0063ca;}
+/* Equipos cards */
+.eq-card{background:var(--surface);border:1px solid var(--sep);border-radius:12px;padding:14px;margin-bottom:10px;}
+.eq-card-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.eq-name{font-weight:760;font-size:14px;}
+.eq-serv{font-size:12px;color:var(--text3);}
+.eq-stat{font-size:12px;color:var(--text3);margin-left:auto;}
+.eq-card-cfg{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;}
+.eq-field>span.fl{display:block;font-size:11px;color:var(--text3);margin-bottom:4px;font-weight:680;text-transform:uppercase;letter-spacing:.04em;}
+.ds-check{display:inline-flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;color:var(--text3);cursor:pointer;}
+.ds-check input{width:16px;height:16px;cursor:pointer;}
+.ds-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
 .num-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 2px;}
 .num-row .nr-label{font-size:13.5px;font-weight:620;}
 .num-row .nr-sub{font-size:11px;color:var(--text3);font-weight:550;}
@@ -555,9 +568,23 @@ input,select,textarea{font-family:inherit;color:var(--text);}
         <button class="btn btn-primary" onclick="setView('importar')">Importar Excel</button>
       </div>
       <div id="dashBody">
-        <div style="display:flex;align-items:center;gap:10px;margin:0 0 14px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;margin:0 0 10px;flex-wrap:wrap;">
           <label class="field-label" style="margin:0;">Período</label>
           <select class="sel" id="dashPeriod" style="width:auto;min-width:170px;" onchange="renderDash()"></select>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+            <span class="field-label" style="margin:0;">Servicios en gráficos</span>
+            <button class="chip-btn" onclick="dashServQuick(true)">Todos</button>
+            <button class="chip-btn" onclick="dashServQuick(false)">Ninguno</button>
+          </div>
+          <div id="dashServChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <span class="field-label" style="margin:0;">Comparar evolución con</span>
+          <select class="sel" id="dashCmpYear" style="width:auto;min-width:120px;" onchange="renderDash()">
+            <option value="">— sin comparación —</option>
+          </select>
         </div>
         <div class="grid-4" id="dashKpis"></div>
         <div class="grid-2" style="margin-top:16px;">
@@ -568,7 +595,7 @@ input,select,textarea{font-family:inherit;color:var(--text);}
           </div>
           <div class="card-solid chart-card">
             <h3>Evolución mensual</h3>
-            <div class="chart-sub">Total de estudios · últimos 12 períodos</div>
+            <div class="chart-sub" id="dashEvoSub">Últimos 12 períodos</div>
             <div class="chart-wrap"><canvas id="chEvo"></canvas></div>
           </div>
           <div class="card-solid chart-card">
@@ -769,12 +796,24 @@ input,select,textarea{font-family:inherit;color:var(--text);}
     <!-- ─── Vista: Equipos ─── -->
     <div class="view" id="view-equipos">
       <div class="section-title">🛠 Equipos y capacidad</div>
-      <div class="section-sub">Definí la capacidad mensual estimada (estudios/mes) de cada equipo para calcular la ociosidad en los informes. Los equipos aparecen automáticamente al importar datos con columna Equipo.</div>
+      <div class="section-sub">Definí la capacidad diaria de cada equipo, su horario de atención y los días en que trabaja. El sistema calcula los días hábiles reales del mes (descontando feriados no trabajados) para medir la ociosidad con precisión.</div>
       <div class="card-solid" style="padding:18px;">
-        <div id="equiposList" style="font-size:13px;color:var(--text3);">Sin datos de equipos todavía.</div>
+        <div id="equiposList" style="font-size:13px;color:var(--text3);">Sin datos de equipos todavía. Importá un Excel mapeando la columna Equipo.</div>
         <div style="display:flex;justify-content:flex-end;margin-top:14px;">
-          <button class="btn btn-primary" id="btnSaveEquipos" onclick="guardarEquipos()">💾 Guardar capacidades</button>
+          <button class="btn btn-primary" id="btnSaveEquipos" style="display:none;" onclick="guardarEquipos()">💾 Guardar configuración de equipos</button>
         </div>
+      </div>
+
+      <div class="card-solid" style="padding:18px;margin-top:16px;">
+        <h3 style="margin:0 0 4px;font-size:15px;font-weight:760;">📅 Feriados y días no laborables</h3>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:12px;">El sistema descarga los feriados nacionales argentinos automáticamente. Marcá cuáles se trabajaron y con qué equipos para que el cálculo de ociosidad sea exacto.</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+          <label class="field-label" style="margin:0;">Año</label>
+          <select class="sel" id="calYear" style="width:auto;min-width:90px;" onchange="onCalYearChange()"></select>
+          <button class="btn btn-secondary btn-sm" onclick="fetchFeriadosBtn()">🔄 Actualizar desde internet</button>
+          <button class="btn btn-primary btn-sm" id="btnSaveCal" style="display:none;" onclick="guardarCalendario()">💾 Guardar cambios</button>
+        </div>
+        <div id="calList" style="font-size:13px;color:var(--text3);">Abrí esta sección para cargar los feriados.</div>
       </div>
     </div>
 
@@ -883,8 +922,8 @@ input,select,textarea{font-family:inherit;color:var(--text);}
    meta app-version y el comentario <!-- vX.Y.Z --> de la línea 2.
    ═══════════════════════════════════════════ */
 var APP_VERSION=(document.querySelector('meta[name="app-version"]')||{}).content||"";
-var APP_DISPLAY_VERSION="1.0.6";
-var APP_BUILD="15/06/26 14:30";
+var APP_DISPLAY_VERSION="1.0.7";
+var APP_BUILD="15/06/26 20:00";
 function doUpdate(){
   toast("⚡ Actualizando...");
   setTimeout(function(){
@@ -950,9 +989,12 @@ var TRASH_DAYS=20;
 
 var currentUser=null,isAdmin=false,_accessSeq=0;
 var _docs={};           // period "YYYY-MM" -> doc data
-var _equipCfg={};       // normKey(equipo) -> {n,s,cap}
+var _equipCfg={};       // normKey(equipo) -> {n,s,capDia,cap,diasSemana,horaInicio,horaFin}
 var _favDeriv=[];       // nombres de médicos favoritos
 var _trash={};          // id papelera -> {type,period,label,data,deletedAt,...}
+var _calConfig={};      // "YYYY" -> [{fecha,motivo,tipo,trabajado,equiposAbiertos}]
+var _calCurYear=new Date().getFullYear();
+var _dashServFilter={}; // normKey(serv) -> true/false; empty = all selected
 var _unsubData=null,_unsubUsers=null,_unsubCfg=null,_unsubFav=null,_unsubTrash=null;
 var _lastUsers=[];
 
@@ -1157,7 +1199,16 @@ function startListeners(){
     _equipCfg={};
     if(d.exists){
       var items=(d.data()||{}).items||[];
-      items.forEach(function(it){if(it&&it.n)_equipCfg[normKey(it.n)]={n:it.n,s:it.s||"",cap:Number(it.cap)||0};});
+      items.forEach(function(it){
+        if(it&&it.n)_equipCfg[normKey(it.n)]={
+          n:it.n,s:it.s||"",
+          capDia:Number(it.capDia)||0,
+          cap:Number(it.cap)||0,
+          diasSemana:it.diasSemana||[1,2,3,4,5],
+          horaInicio:it.horaInicio||"08:00",
+          horaFin:it.horaFin||"20:00"
+        };
+      });
     }
     renderEquipos();
   });
@@ -1341,6 +1392,7 @@ function setView(v){
   var tabs=document.querySelectorAll("#bottom-bar .tab");
   for(var j=0;j<tabs.length;j++)tabs[j].classList.toggle("on",tabs[j].getAttribute("data-tab")===v);
   window.scrollTo(0,0);
+  if(v==="equipos")setTimeout(ensureCalendario,0);
 }
 
 /* ═══════════════════════════════════════════
@@ -1363,6 +1415,11 @@ function mkChart(canvasId,cfg,_attempt){
 function baseGrid(){
   return {grid:{color:"rgba(60,60,67,.08)"},ticks:{color:"#6b7280",font:{size:11}}};
 }
+function dashServQuick(on){
+  var all=allServicios();
+  all.forEach(function(s){_dashServFilter[normKey(s.n)]=on;});
+  renderDash();
+}
 function renderDash(){
   var periods=sortedPeriods();
   var has=periods.length>0;
@@ -1371,6 +1428,7 @@ function renderDash(){
   $("dashSub").textContent=has?(periods.length+" meses cargados · "+periodLabel(periods[0])+" a "+periodLabel(periods[periods.length-1])):"Sin datos cargados todavía.";
   if(!has)return;
 
+  /* ── Período ── */
   var sel=$("dashPeriod");
   var prev=sel.value;
   var opts='<option value="__all">Todos los períodos</option>';
@@ -1383,18 +1441,52 @@ function renderDash(){
   var selPeriods=sel.value==="__all"?periods:[sel.value];
   var scopeLabel=sel.value==="__all"?"todos los períodos":periodLabel(sel.value);
 
-  // KPIs
-  var total=0;selPeriods.forEach(function(p){total+=getMonthlyTotal(p);});
-  var servArr=getServTotals(selPeriods,null);
+  /* ── Año de comparación ── */
+  var cmpSel=$("dashCmpYear");
+  var prevCmp=cmpSel?cmpSel.value:"";
+  var yrsMap={};periods.forEach(function(p){yrsMap[p.split("-")[0]]=1;});
+  var yrList=Object.keys(yrsMap).sort().reverse();
+  if(cmpSel){
+    var co='<option value="">— sin comparación —</option>';
+    yrList.forEach(function(y){co+='<option value="'+y+'">'+y+'</option>';});
+    cmpSel.innerHTML=co;
+    if(prevCmp&&yrsMap[prevCmp])cmpSel.value=prevCmp;
+  }
+  var cmpYear=cmpSel?cmpSel.value:"";
+
+  /* ── Filtro de servicios ── */
+  var allServs=allServicios();
+  // Init filter if empty
+  if(!Object.keys(_dashServFilter).length){
+    allServs.forEach(function(s){_dashServFilter[normKey(s.n)]=true;});
+  }
+  // Sync new services into filter (new services default to true)
+  allServs.forEach(function(s){if(!(normKey(s.n) in _dashServFilter)){_dashServFilter[normKey(s.n)]=true;}});
+  // Render chips
+  var chipsEl=$("dashServChips");
+  if(chipsEl){
+    var ch="";
+    allServs.forEach(function(s){
+      var on=!!_dashServFilter[normKey(s.n)];
+      ch+='<button class="chip-btn'+(on?" chip-on":"")+'" onclick="_dashServFilter[\''+escAttr(normKey(s.n))+'\']='+(on?"false":"true")+';renderDash()">'+escHtml(s.n)+'</button>';
+    });
+    chipsEl.innerHTML=ch;
+  }
+  // Build filter map
+  var anyOff=false;
+  allServs.forEach(function(s){if(!_dashServFilter[normKey(s.n)])anyOff=true;});
+  var servFilt=null;
+  if(anyOff){servFilt={};allServs.forEach(function(s){if(_dashServFilter[normKey(s.n)])servFilt[normKey(s.n)]=1;});}
+
+  /* ── KPIs ── */
+  var servArr=getServTotals(selPeriods,servFilt);
   var centArr=getCentros(selPeriods,null);
+  var total=0;servArr.forEach(function(x){total+=x.c;});
   var lastP=periods[periods.length-1],prevP=periods.length>1?periods[periods.length-2]:null;
   var varHtml="—";
   if(prevP){
     var a=getMonthlyTotal(lastP),b=getMonthlyTotal(prevP);
-    if(b>0){
-      var pct=(a-b)/b;
-      varHtml='<span class="'+(pct>=0?"up":"down")+'">'+(pct>=0?"▲ ":"▼ ")+fmtPct(Math.abs(pct))+'</span> vs '+periodShort(prevP);
-    }
+    if(b>0){var pct=(a-b)/b;varHtml='<span class="'+(pct>=0?"up":"down")+'">'+(pct>=0?"▲ ":"▼ ")+fmtPct(Math.abs(pct))+'</span> vs '+periodShort(prevP);}
   }
   $("dashKpis").innerHTML=
     '<div class="gc kpi"><div class="kpi-label">Estudios totales</div><div class="kpi-value">'+fmtN(total)+'</div><div class="kpi-extra">'+escHtml(scopeLabel)+'</div></div>'+
@@ -1402,10 +1494,9 @@ function renderDash(){
     '<div class="gc kpi"><div class="kpi-label">Centros</div><div class="kpi-value">'+(centArr.length||"—")+'</div><div class="kpi-extra">con actividad</div></div>'+
     '<div class="gc kpi"><div class="kpi-label">Último mes</div><div class="kpi-value">'+fmtN(getMonthlyTotal(lastP))+'</div><div class="kpi-extra">'+varHtml+'</div></div>';
 
-  // Bar servicios
+  /* ── Bar: servicios (filtrado) ── */
   $("dashServSub").textContent="Estudios por servicio · "+scopeLabel;
-  mkChart("chServ",{
-    type:"bar",
+  mkChart("chServ",{type:"bar",
     data:{labels:servArr.map(function(x){return x.n;}),
       datasets:[{data:servArr.map(function(x){return x.c;}),
         backgroundColor:servArr.map(function(x,i){return PALETTE[i%PALETTE.length];}),
@@ -1413,32 +1504,54 @@ function renderDash(){
     options:{plugins:{legend:{display:false}},scales:{x:baseGrid(),y:baseGrid()}}
   });
 
-  // Línea evolución (últimos 12)
+  /* ── Línea: evolución últimos 12 + comparación año anterior ── */
   var evo=periods.slice(-12);
-  mkChart("chEvo",{
-    type:"line",
-    data:{labels:evo.map(periodShort),
-      datasets:[{data:evo.map(getMonthlyTotal),borderColor:"#0a84ff",
-        backgroundColor:"rgba(10,132,255,.12)",fill:true,tension:.35,
-        pointRadius:4,pointBackgroundColor:"#0a84ff",borderWidth:2.5}]},
-    options:{plugins:{legend:{display:false}},scales:{x:baseGrid(),y:baseGrid()}}
+  function evoTotalForPeriod(p){
+    var d=_docs[p];if(!d)return 0;
+    if(!servFilt)return d.total||0;
+    var t=0;(d.servicios||[]).forEach(function(it){if(servFilt[normKey(it.n)])t+=it.c;});
+    return t;
+  }
+  var evoDsets=[{
+    label:"Actual",
+    data:evo.map(evoTotalForPeriod),
+    borderColor:"#0a84ff",backgroundColor:"rgba(10,132,255,.12)",fill:true,
+    tension:.35,pointRadius:4,pointBackgroundColor:"#0a84ff",borderWidth:2.5
+  }];
+  if(cmpYear){
+    var cmpData=evo.map(function(p){
+      var mm=p.split("-")[1];
+      var cmpP=cmpYear+"-"+mm;
+      if(!_docs[cmpP])return null;
+      return evoTotalForPeriod(cmpP);
+    });
+    evoDsets.push({
+      label:cmpYear,
+      data:cmpData,
+      borderColor:"#ff9500",backgroundColor:"transparent",fill:false,
+      tension:.32,pointRadius:3,pointBackgroundColor:"#ff9500",borderWidth:2,
+      borderDash:[6,3],spanGaps:false
+    });
+  }
+  var evoSubText="Últimos 12 períodos"+(cmpYear?" · comparado con "+cmpYear:"");
+  if($("dashEvoSub"))$("dashEvoSub").textContent=evoSubText;
+  mkChart("chEvo",{type:"line",
+    data:{labels:evo.map(periodShort),datasets:evoDsets},
+    options:{plugins:{legend:{display:evoDsets.length>1,labels:{font:{size:11},boxWidth:12}}},scales:{x:baseGrid(),y:baseGrid()}}
   });
 
-  // Obras sociales (horizontal)
+  /* ── Obras (horizontal) ── */
   var obras=getObrasTop(selPeriods,10);
   $("dashObrasSub").textContent="Top 10 · "+scopeLabel;
-  mkChart("chObras",{
-    type:"bar",
+  mkChart("chObras",{type:"bar",
     data:{labels:obras.map(function(x){return x.n.length>28?x.n.substring(0,27)+"…":x.n;}),
-      datasets:[{data:obras.map(function(x){return x.c;}),
-        backgroundColor:"rgba(10,132,255,.78)",borderRadius:6,maxBarThickness:22}]},
+      datasets:[{data:obras.map(function(x){return x.c;}),backgroundColor:"rgba(10,132,255,.78)",borderRadius:6,maxBarThickness:22}]},
     options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:baseGrid(),y:{grid:{display:false},ticks:{color:"#3a3a3c",font:{size:10.5}}}}}
   });
 
-  // Centros (doughnut)
+  /* ── Centros (doughnut) ── */
   $("dashCentrosSub").textContent="Participación por centro · "+scopeLabel;
-  mkChart("chCentros",{
-    type:"doughnut",
+  mkChart("chCentros",{type:"doughnut",
     data:{labels:centArr.map(function(x){return x.n;}),
       datasets:[{data:centArr.map(function(x){return x.c;}),
         backgroundColor:centArr.map(function(x,i){return PALETTE[i%PALETTE.length];}),
@@ -2398,7 +2511,12 @@ function buildReport(selP,selS){
       eqs.forEach(function(e){
         var prodAvg=e.c/selP.length;
         var cfg=_equipCfg[normKey(e.n)];
-        var cap=cfg?cfg.cap:0;
+        var cap=0;
+        if(cfg&&cfg.capDia>0){
+          var tcap6=0;
+          selP.forEach(function(p6){var pp6=p6.split("-");tcap6+=calcCapacityForPeriod(cfg,parseInt(pp6[0],10),parseInt(pp6[1],10));});
+          cap=selP.length?tcap6/selP.length:0;
+        }else if(cfg){cap=cfg.cap||0;}
         var uso=cap>0?prodAvg/cap:null;
         var ocio=uso!=null?Math.max(0,1-uso):null;
         if(uso==null)missing++;
@@ -2594,14 +2712,53 @@ function buildDerivReport(selP,selDocs){
           labels:byServ.map(function(x){return x.n;}),
           datasets:[{data:byServ.map(function(x){return x.c;}),backgroundColor:byServ.map(function(x,i){return PALETTE[i%PALETTE.length];}),borderRadius:6,maxBarThickness:46}]},
           options:{plugins:{legend:{display:false}},scales:{x:rptGrid(),y:rptGrid()}}},900,300);
+        body5+=rptTable([{t:"Servicio"},{t:"Derivaciones",r:1},{t:"% del médico",r:1},{t:"% del servicio (institución)",r:1}],
+          byServ.map(function(x){
+            var servTotal=0;
+            selP.forEach(function(p){servTotal+=getMonthlyServ(p,x.n);});
+            return [escHtml(x.n),fmtN(x.c),fmtPct(docTotal?x.c/docTotal:0),fmtPct(servTotal?x.c/servTotal:0)];
+          }));
+        /* Prácticas top por cada servicio derivado */
+        if(byServ.length){
+          body5+='<div class="rpt-h3">Estudios derivados por servicio</div>';
+          byServ.forEach(function(sv,si){
+            var pract=getPracticasTop(selP,sv.n,10);
+            if(!pract.length)return;
+            // Filter to only practices where this doctor derives — approximate via all practices of the service
+            body5+='<div style="font-size:10.5pt;font-weight:760;color:#1a3a6b;margin:8px 0 4px;">'+escHtml(sv.n)+'</div>';
+            body5+=rptTable([{t:"Práctica / Estudio (top del servicio)"},{t:"Total servicio",r:1}],
+              pract.map(function(x){return [escHtml(x.n),fmtN(x.c)];}));
+          });
+        }
         if(opts.evolucion&&selP.length>1){
           body5+='<div class="rpt-h3">Evolución mensual</div>';
           body5+=chartImg({type:"line",data:{labels:selP.map(periodShort),
-            datasets:[{data:derivMonthly(selP,k),borderColor:PALETTE[di%PALETTE.length],backgroundColor:"rgba(26,58,107,.08)",fill:true,tension:.35,pointRadius:4,pointBackgroundColor:PALETTE[di%PALETTE.length],borderWidth:2.5}]},
+            datasets:[{label:name,data:derivMonthly(selP,k),borderColor:PALETTE[di%PALETTE.length],backgroundColor:"rgba(26,58,107,.08)",fill:true,tension:.35,pointRadius:4,pointBackgroundColor:PALETTE[di%PALETTE.length],borderWidth:2.5}]},
             options:{plugins:{legend:{display:false}},scales:{x:rptGrid(),y:rptGrid()}}},900,250);
         }
-        body5+=rptTable([{t:"Servicio"},{t:"Derivaciones",r:1},{t:"% del médico",r:1}],
-          byServ.map(function(x){return [escHtml(x.n),fmtN(x.c),fmtPct(docTotal?x.c/docTotal:0)];}));
+        /* Comparativa contra otros médicos seleccionados en el mismo servicio principal */
+        if(selDocs.length>1&&byServ.length){
+          var mainServ=byServ[0].n; // servicio principal del médico
+          var compPeers=[];
+          selDocs.forEach(function(peerName){
+            if(normKey(peerName)===k)return;
+            var peerByServ=derivByServ(selP,normKey(peerName));
+            var peerInServ=0;
+            peerByServ.forEach(function(x){if(normKey(x.n)===normKey(mainServ))peerInServ+=x.c;});
+            var peerTotal=0;peerByServ.forEach(function(x){peerTotal+=x.c;});
+            compPeers.push({n:peerName,c:peerInServ,total:peerTotal});
+          });
+          compPeers.sort(function(a,b){return b.c-a.c;});
+          if(compPeers.length){
+            var myInServ=0;byServ.forEach(function(x){if(normKey(x.n)===normKey(mainServ))myInServ+=x.c;});
+            var compRows=[[escHtml(name)+'<span style="margin-left:6px;font-size:9pt;color:#1a3a6b;font-weight:900;">← este médico</span>',fmtN(docTotal),fmtN(myInServ)]];
+            compPeers.forEach(function(p){
+              compRows.push([escHtml(p.n),fmtN(p.total),fmtN(p.c)]);
+            });
+            body5+='<div class="rpt-h3">Comparativa con médicos seleccionados · '+escHtml(mainServ)+'</div>';
+            body5+=rptTable([{t:"Médico"},{t:"Total derivaciones",r:1},{t:"En "+escHtml(mainServ),r:1}],compRows);
+          }
+        }
       }
       addSection("sec-med-"+di,name,"Ficha de derivación · "+rangeLabel,body5);
     });
@@ -2650,40 +2807,245 @@ function closeReport(){
 /* ═══════════════════════════════════════════
    EQUIPOS / CAPACIDAD
    ═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   FERIADOS ARGENTINOS + DÍAS HÁBILES
+   ═══════════════════════════════════════════ */
+var AR_FERIADOS_BASE=[
+  {mes:1,dia:1,motivo:"Año Nuevo",tipo:"inamovible"},
+  {mes:3,dia:24,motivo:"Día Nacional de la Memoria",tipo:"inamovible"},
+  {mes:4,dia:2,motivo:"Veteranos de Malvinas",tipo:"inamovible"},
+  {mes:5,dia:1,motivo:"Día del Trabajador",tipo:"inamovible"},
+  {mes:5,dia:25,motivo:"Revolución de Mayo",tipo:"inamovible"},
+  {mes:6,dia:20,motivo:"Paso a la Inmortalidad del Gral. Belgrano",tipo:"inamovible"},
+  {mes:7,dia:9,motivo:"Día de la Independencia",tipo:"inamovible"},
+  {mes:8,dia:17,motivo:"San Martín (referencia)",tipo:"trasladable"},
+  {mes:10,dia:12,motivo:"Diversidad Cultural (referencia)",tipo:"trasladable"},
+  {mes:11,dia:20,motivo:"Soberanía Nacional (referencia)",tipo:"trasladable"},
+  {mes:12,dia:8,motivo:"Inmaculada Concepción de María",tipo:"inamovible"},
+  {mes:12,dia:25,motivo:"Navidad",tipo:"inamovible"}
+];
+function buildFeriadosFallback(year){
+  return AR_FERIADOS_BASE.map(function(f){
+    return {fecha:year+"-"+("0"+f.mes).slice(-2)+"-"+("0"+f.dia).slice(-2),
+      motivo:f.motivo,tipo:f.tipo,trabajado:false,equiposAbiertos:[]};
+  });
+}
+function fetchFeriadosBtn(){
+  var y=parseInt(($("calYear")||{}).value||_calCurYear,10);
+  toast("⏳ Descargando feriados "+y+"…");
+  fetchFeriados(y,function(){toast("✓ Feriados "+y+" actualizados");});
+}
+function fetchFeriados(year,cb){
+  fetch("https://nolaborables.com.ar/api/v2/feriados/"+year)
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var existing=_calConfig[String(year)]||[];
+      var exMap={};existing.forEach(function(f){exMap[f.fecha]=f;});
+      var items=[];
+      data.forEach(function(f){
+        var fecha=year+"-"+("0"+f.mes).slice(-2)+"-"+("0"+f.dia).slice(-2);
+        var ex=exMap[fecha]||{};
+        items.push({fecha:fecha,motivo:f.motivo||"",tipo:f.tipo||"",
+          trabajado:ex.trabajado||false,equiposAbiertos:ex.equiposAbiertos||[]});
+      });
+      items.sort(function(a,b){return a.fecha<b.fecha?-1:1;});
+      _calConfig[String(year)]=items;
+      _db.collection(DB_CONFIG).doc("feriados_"+year).set({items:items,year:year,fetchedAt:new Date().toISOString()}).catch(function(){});
+      renderCalendario();
+      if(cb)cb(items);
+    }).catch(function(){
+      if(!(_calConfig[String(year)]||[]).length){
+        _calConfig[String(year)]=buildFeriadosFallback(year);
+        renderCalendario();
+      }
+      if(cb)cb(_calConfig[String(year)]||[]);
+    });
+}
+function loadCalFromFirestore(year){
+  _db.collection(DB_CONFIG).doc("feriados_"+year).get().then(function(d){
+    if(d.exists&&(d.data().items||[]).length){
+      _calConfig[String(year)]=d.data().items;
+    }else{
+      _calConfig[String(year)]=buildFeriadosFallback(year);
+    }
+    renderCalendario();
+  }).catch(function(){
+    _calConfig[String(year)]=buildFeriadosFallback(year);
+    renderCalendario();
+  });
+}
+function onCalYearChange(){
+  var y=parseInt(($("calYear")||{}).value||_calCurYear,10);
+  _calCurYear=y;
+  if(!(_calConfig[String(y)]||[]).length){loadCalFromFirestore(y);}else{renderCalendario();}
+}
+function ensureCalendario(){
+  if(!(_calConfig[String(_calCurYear)]||[]).length){loadCalFromFirestore(_calCurYear);}else{renderCalendario();}
+}
+function toggleCalTrabajado(fi){
+  var items=_calConfig[String(_calCurYear)];
+  if(!items||!items[fi])return;
+  items[fi].trabajado=!items[fi].trabajado;
+  if(!items[fi].trabajado)items[fi].equiposAbiertos=[];
+  renderCalendario();
+}
+function toggleCalEquipo(fi,equipoName){
+  var items=_calConfig[String(_calCurYear)];
+  if(!items||!items[fi])return;
+  var arr=items[fi].equiposAbiertos||[];
+  var idx=arr.indexOf(equipoName);
+  if(idx!==-1)arr.splice(idx,1);else arr.push(equipoName);
+  items[fi].equiposAbiertos=arr;
+}
+function guardarCalendario(){
+  var year=_calCurYear;
+  var items=_calConfig[String(year)]||[];
+  _db.collection(DB_CONFIG).doc("feriados_"+year).set({
+    items:items,year:year,updatedAt:new Date().toISOString(),updatedBy:currentUser?currentUser.email:""
+  }).then(function(){toast("✓ Calendario "+year+" guardado");})
+    .catch(function(e){toast("⚠️ Error: "+e.message);});
+}
+function renderCalendario(){
+  var calYearSel=$("calYear");if(!calYearSel)return;
+  var now=new Date().getFullYear();
+  var opts="";
+  for(var y2=now-1;y2<=now+1;y2++)opts+='<option value="'+y2+'"'+(y2===_calCurYear?" selected":"")+'>'+y2+'</option>';
+  calYearSel.innerHTML=opts;
+  var year=_calCurYear;
+  var items=_calConfig[String(year)];
+  if($("btnSaveCal"))$("btnSaveCal").style.display="inline-flex";
+  if(!items){$("calList").innerHTML='<p style="color:var(--text3);">Cargando…</p>';loadCalFromFirestore(year);return;}
+  var eqs=[];for(var k in _equipCfg)eqs.push(_equipCfg[k].n);eqs.sort();
+  var TIPO_LABEL={inamovible:"Inamovible",trasladable:"Trasladable",nolaborable:"No laborable",puente:"Puente",opcional:"Opcional"};
+  var DIAS=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  var html='<table class="tbl"><thead><tr><th>Fecha</th><th>Motivo</th><th>Tipo</th><th>¿Se trabajó?</th><th>Equipos abiertos</th></tr></thead><tbody>';
+  items.forEach(function(f,fi){
+    var dow=new Date(f.fecha+"T12:00:00").getDay();
+    var isWeekend=dow===0||dow===6;
+    var dateStr=f.fecha.split("-").reverse().join("/")+(" ("+DIAS[dow]+")");
+    var eqSel="";
+    if(f.trabajado&&eqs.length){
+      eqs.forEach(function(en){
+        var isOpen=(f.equiposAbiertos||[]).indexOf(en)!==-1;
+        eqSel+='<label style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:11.5px;cursor:pointer;">'+
+          '<input type="checkbox"'+(isOpen?" checked":"")+' onchange="toggleCalEquipo('+fi+',\''+escAttr(en)+'\')"> '+escHtml(en)+'</label>';
+      });
+    }
+    html+='<tr'+(isWeekend?' style="opacity:.55;"':'')+'>'+
+      '<td style="white-space:nowrap;font-size:12px;">'+escHtml(dateStr)+'</td>'+
+      '<td style="font-size:12px;">'+escHtml(f.motivo)+'</td>'+
+      '<td><span class="pill pill-'+(f.tipo==="inamovible"?"orange":(f.tipo==="nolaborable"?"blue":"green"))+'">'+escHtml(TIPO_LABEL[f.tipo]||f.tipo)+'</span></td>'+
+      '<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;">'+
+        '<input type="checkbox"'+(f.trabajado?" checked":"")+' onchange="toggleCalTrabajado('+fi+')">'+(f.trabajado?"Sí":"No")+'</label></td>'+
+      '<td style="font-size:11.5px;">'+(f.trabajado?(eqSel||'<span style="color:var(--text3);">Todos</span>'):'<span style="color:var(--text3);">—</span>')+'</td>'+
+      '</tr>';
+  });
+  html+='</tbody></table>';
+  $("calList").innerHTML=items.length?html:'<p style="color:var(--text3);">Sin feriados. Presioná "Actualizar desde internet".</p>';
+}
+
+/* ═══ Días hábiles reales ═══ */
+function getWorkingDaysInMonth(year,month,diasSemana,equipoName){
+  var ds=(diasSemana&&diasSemana.length)?diasSemana:[1,2,3,4,5];
+  var daysInMonth=new Date(year,month,0).getDate();
+  var count=0;
+  for(var d=1;d<=daysInMonth;d++){if(ds.indexOf(new Date(year,month-1,d).getDay())!==-1)count++;}
+  var calYear=_calConfig[String(year)]||[];
+  calYear.forEach(function(f){
+    var parts=f.fecha.split("-");
+    if(parseInt(parts[1],10)!==month)return;
+    var dow=new Date(f.fecha+"T12:00:00").getDay();
+    if(ds.indexOf(dow)===-1)return;
+    if(!f.trabajado){count--;return;}
+    if(equipoName){
+      var arr=f.equiposAbiertos||[];
+      var eqOpen=!arr.length||(arr.indexOf(equipoName)!==-1);
+      if(!eqOpen)count--;
+    }
+  });
+  return Math.max(0,count);
+}
+function calcCapacityForPeriod(cfg,year,month){
+  if(!cfg)return 0;
+  var capDia=cfg.capDia||0;
+  if(!capDia)return cfg.cap||0;
+  var ds=cfg.diasSemana||[1,2,3,4,5];
+  return capDia*getWorkingDaysInMonth(year,month,ds,cfg.n||"");
+}
+
 function renderEquipos(){
   var el=$("equiposList");if(!el)return;
   var periods=sortedPeriods();
   var eqs=getEquipos(periods,null);
-  $("btnSaveEquipos").style.display=eqs.length?"inline-flex":"none";
+  var btnSave=$("btnSaveEquipos");
+  if(btnSave)btnSave.style.display=eqs.length?"inline-flex":"none";
   if(!eqs.length){
     el.innerHTML='<p style="font-size:13px;color:var(--text3)">Sin datos de equipos todavía. Importá un Excel mapeando la columna Equipo.</p>';
     return;
   }
-  var html='<table class="tbl"><thead><tr><th>Equipo</th><th>Servicio</th><th class="num">Prom. mensual</th><th class="num">Capacidad/mes</th><th>Uso</th></tr></thead><tbody>';
+  var DS_LABELS=["D","L","M","X","J","V","S"]; // Sun=0..Sat=6
+  var html="";
   eqs.forEach(function(e,i){
     var prodAvg=e.nm?e.c/e.nm:0;
-    var cfg=_equipCfg[normKey(e.n)];
-    var cap=cfg?cfg.cap:0;
-    var uso=cap>0?prodAvg/cap:null;
+    var cfg=_equipCfg[normKey(e.n)]||{};
+    // Calc avg capacity using working days
+    var avgCap=0;
+    if(cfg.capDia&&periods.length){
+      var tcap=0;
+      periods.forEach(function(p){
+        var pp=p.split("-");
+        tcap+=calcCapacityForPeriod(cfg,parseInt(pp[0],10),parseInt(pp[1],10));
+      });
+      avgCap=tcap/periods.length;
+    }else{avgCap=cfg.cap||0;}
+    var uso=avgCap>0?prodAvg/avgCap:null;
     var cls=uso==null?"":(uso>=0.75?"":(uso>=0.5?"warn":"crit"));
-    html+='<tr>'+
-      '<td style="font-weight:680;">'+escHtml(e.n)+'</td>'+
-      '<td>'+escHtml(e.s||"—")+'</td>'+
-      '<td class="num">'+fmtN(prodAvg)+'</td>'+
-      '<td class="num"><input type="number" class="inp inp-num eq-cap" min="0" data-eq="'+escAttr(e.n)+'" data-serv="'+escAttr(e.s||"")+'" value="'+(cap||"")+'" placeholder="—"></td>'+
-      '<td>'+(uso!=null?'<div style="display:flex;align-items:center;gap:8px;"><div class="usage-bar" style="flex:1;"><div class="'+cls+'" style="width:'+Math.min(100,Math.round(uso*100))+'%;"></div></div><span style="font-size:11px;font-weight:700;min-width:42px;text-align:right;">'+fmtPct(uso)+'</span></div>':'<span style="font-size:11px;color:var(--text3);">configurá capacidad</span>')+'</td>'+
-      '</tr>';
+    var ds=cfg.diasSemana||[1,2,3,4,5];
+    // Day checkboxes
+    var daysHtml='<div class="ds-wrap">';
+    for(var d=0;d<7;d++){
+      var on=ds.indexOf(d)!==-1;
+      daysHtml+='<label class="ds-check"><input type="checkbox" class="eq-ds" data-eq="'+escAttr(e.n)+'" data-dow="'+d+'"'+(on?" checked":"")+'>'+DS_LABELS[d]+'</label>';
+    }
+    daysHtml+='</div>';
+    html+='<div class="eq-card">'+
+      '<div class="eq-card-head">'+
+        '<span class="eq-name">'+escHtml(e.n)+'</span>'+
+        '<span class="eq-serv">'+escHtml(e.s||"")+'</span>'+
+        '<span class="eq-stat">'+fmtN(prodAvg)+' est/mes prom. · '+
+          (uso!=null?'Uso: <b>'+fmtPct(uso)+'</b>':'sin capacidad configurada')+'</span>'+
+      '</div>'+
+      '<div class="eq-card-cfg">'+
+        '<div class="eq-field"><span class="fl">Capacidad / Día</span>'+
+          '<input type="number" class="inp inp-num eq-cap-dia" min="0" data-eq="'+escAttr(e.n)+'" data-serv="'+escAttr(e.s||"")+'" value="'+(cfg.capDia||"")+'" placeholder="estudios/día"></div>'+
+        '<div class="eq-field"><span class="fl">Horario</span>'+
+          '<span style="display:flex;align-items:center;gap:6px;">'+
+          '<input type="time" class="inp eq-hora-ini" data-eq="'+escAttr(e.n)+'" value="'+(cfg.horaInicio||"08:00")+'" style="width:115px;">'+
+          '<span style="font-size:12px;color:var(--text3);">a</span>'+
+          '<input type="time" class="inp eq-hora-fin" data-eq="'+escAttr(e.n)+'" value="'+(cfg.horaFin||"20:00")+'" style="width:115px;"></span></div>'+
+        '<div class="eq-field"><span class="fl">Días laborables</span>'+daysHtml+'</div>'+
+      '</div>'+
+      (uso!=null?'<div style="display:flex;align-items:center;gap:8px;margin-top:12px;"><div class="usage-bar" style="flex:1;"><div class="'+cls+'" style="width:'+Math.min(100,Math.round(uso*100))+'%;"></div></div><span style="font-size:11.5px;font-weight:700;min-width:46px;text-align:right;">'+fmtPct(uso)+'</span></div>':'')+'</div>';
   });
-  el.innerHTML=html+"</tbody></table>";
+  el.innerHTML=html;
 }
 function guardarEquipos(){
-  var inputs=document.querySelectorAll(".eq-cap"),items=[];
-  for(var i=0;i<inputs.length;i++){
-    var cap=parseFloat(inputs[i].value);
-    items.push({n:inputs[i].getAttribute("data-eq"),s:inputs[i].getAttribute("data-serv"),cap:isNaN(cap)?0:cap});
+  var diaInputs=document.querySelectorAll(".eq-cap-dia");
+  var items=[];
+  for(var i=0;i<diaInputs.length;i++){
+    var inp=diaInputs[i];
+    var eqN=inp.getAttribute("data-eq"),eqS=inp.getAttribute("data-serv");
+    var capDia=parseFloat(inp.value);capDia=isNaN(capDia)?0:capDia;
+    var horaIni=(document.querySelector('.eq-hora-ini[data-eq="'+escAttr(eqN)+'"]')||{}).value||"08:00";
+    var horaFin=(document.querySelector('.eq-hora-fin[data-eq="'+escAttr(eqN)+'"]')||{}).value||"20:00";
+    var ds=[];
+    var dsCbs=document.querySelectorAll('.eq-ds[data-eq="'+escAttr(eqN)+'"]');
+    for(var j=0;j<dsCbs.length;j++){if(dsCbs[j].checked)ds.push(parseInt(dsCbs[j].getAttribute("data-dow"),10));}
+    if(!ds.length)ds=[1,2,3,4,5];
+    items.push({n:eqN,s:eqS,capDia:capDia,cap:Math.round(capDia*20),horaInicio:horaIni,horaFin:horaFin,diasSemana:ds});
   }
   _db.collection(DB_CONFIG).doc("equipos").set({items:items,updatedAt:new Date().toISOString(),updatedBy:currentUser?currentUser.email:""})
-    .then(function(){toast("✓ Capacidades guardadas");})
+    .then(function(){toast("✓ Configuración de equipos guardada");})
     .catch(function(e){toast("⚠️ Error: "+e.message);});
 }
 
