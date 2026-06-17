@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<!-- v1.0.7 -->
+<!-- v1.0.8 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="app-version" content="v1.0.7">
+<meta name="app-version" content="v1.0.8">
 <title>Producción CIMA · Control de Producción</title>
 <link rel="preconnect" href="https://www.gstatic.com">
 <link rel="preconnect" href="https://cdn.sheetjs.com">
@@ -569,8 +569,14 @@ input,select,textarea{font-family:inherit;color:var(--text);}
       </div>
       <div id="dashBody">
         <div style="display:flex;align-items:center;gap:10px;margin:0 0 10px;flex-wrap:wrap;">
-          <label class="field-label" style="margin:0;">Período</label>
-          <select class="sel" id="dashPeriod" style="width:auto;min-width:170px;" onchange="renderDash()"></select>
+          <label class="field-label" style="margin:0;">Desde</label>
+          <select class="sel" id="dashDesde" style="width:auto;min-width:140px;" onchange="renderDash()"></select>
+          <label class="field-label" style="margin:0;">hasta</label>
+          <select class="sel" id="dashHasta" style="width:auto;min-width:140px;" onchange="renderDash()"></select>
+          <button class="chip-btn" onclick="dashPeriodQuick('year')">Este año</button>
+          <button class="chip-btn" onclick="dashPeriodQuick('prev')">Año ant.</button>
+          <button class="chip-btn" onclick="dashPeriodQuick('12')">Últ. 12</button>
+          <button class="chip-btn" onclick="dashPeriodQuick('all')">Todos</button>
         </div>
         <div style="margin-bottom:12px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
@@ -777,6 +783,13 @@ input,select,textarea{font-family:inherit;color:var(--text);}
           <div class="check-list" id="listMedicos"></div>
         </div>
         <div class="card-solid filter-card">
+          <h3>🔬 Filtrar por servicio</h3>
+          <div class="quick-row">
+            <button class="chip-btn chip-on" id="derivServAll" onclick="setDerivServFilter(null)">Todos</button>
+          </div>
+          <div id="derivServChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+        </div>
+        <div class="card-solid filter-card">
           <h3>🎛 Contenido del informe</h3>
           <div class="switch-row"><span class="sw-label">Ranking general de todos los derivantes</span><label class="toggle"><input type="checkbox" id="derivRanking"><span class="tg-track"></span><span class="tg-knob"></span></label></div>
           <div class="num-row">
@@ -798,6 +811,10 @@ input,select,textarea{font-family:inherit;color:var(--text);}
       <div class="section-title">🛠 Equipos y capacidad</div>
       <div class="section-sub">Definí la capacidad diaria de cada equipo, su horario de atención y los días en que trabaja. El sistema calcula los días hábiles reales del mes (descontando feriados no trabajados) para medir la ociosidad con precisión.</div>
       <div class="card-solid" style="padding:18px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;" id="equipFilterBar" style="display:none;">
+          <span class="field-label" style="margin:0;">Filtrar</span>
+          <div id="equipServChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
         <div id="equiposList" style="font-size:13px;color:var(--text3);">Sin datos de equipos todavía. Importá un Excel mapeando la columna Equipo.</div>
         <div style="display:flex;justify-content:flex-end;margin-top:14px;">
           <button class="btn btn-primary" id="btnSaveEquipos" style="display:none;" onclick="guardarEquipos()">💾 Guardar configuración de equipos</button>
@@ -922,8 +939,8 @@ input,select,textarea{font-family:inherit;color:var(--text);}
    meta app-version y el comentario <!-- vX.Y.Z --> de la línea 2.
    ═══════════════════════════════════════════ */
 var APP_VERSION=(document.querySelector('meta[name="app-version"]')||{}).content||"";
-var APP_DISPLAY_VERSION="1.0.7";
-var APP_BUILD="15/06/26 20:00";
+var APP_DISPLAY_VERSION="1.0.8";
+var APP_BUILD="17/06/26 12:00";
 function doUpdate(){
   toast("⚡ Actualizando...");
   setTimeout(function(){
@@ -995,6 +1012,8 @@ var _trash={};          // id papelera -> {type,period,label,data,deletedAt,...}
 var _calConfig={};      // "YYYY" -> [{fecha,motivo,tipo,trabajado,equiposAbiertos}]
 var _calCurYear=new Date().getFullYear();
 var _dashServFilter={}; // normKey(serv) -> true/false; empty = all selected
+var _derivServFilter=null; // null=todos; normKey(serv) para filtrar
+var _equipServFilter=null; // null=todos; normKey(serv) para filtrar equipos
 var _unsubData=null,_unsubUsers=null,_unsubCfg=null,_unsubFav=null,_unsubTrash=null;
 var _lastUsers=[];
 
@@ -1346,39 +1365,64 @@ function allCentros(){
   return mapToArr(map);
 }
 /* ═══ Agregadores por médico derivante (cruzando todos los servicios) ═══ */
-function derivAggInPeriods(periods){
+function derivAggInPeriods(periods,servFilter){
   var map={};
   periods.forEach(function(p){
     var d=_docs[p];if(!d)return;
-    (d.derivantes||[]).forEach(function(it){sumInto(map,it.n,it.c);});
+    (d.derivantes||[]).forEach(function(it){
+      if(servFilter&&normKey(it.s)!==servFilter)return;
+      sumInto(map,it.n,it.c);
+    });
   });
   return mapToArr(map); // [{n,c}] ordenado desc
 }
-function allDerivantes(){return derivAggInPeriods(sortedPeriods());}
-function totalDerivAll(periods){
-  var t=0;periods.forEach(function(p){var d=_docs[p];if(d)(d.derivantes||[]).forEach(function(it){t+=it.c;});});
+function allDerivantes(){return derivAggInPeriods(sortedPeriods(),null);}
+function totalDerivAll(periods,servFilter){
+  var t=0;
+  periods.forEach(function(p){
+    var d=_docs[p];if(!d)return;
+    (d.derivantes||[]).forEach(function(it){
+      if(servFilter&&normKey(it.s)!==servFilter)return;
+      t+=it.c;
+    });
+  });
   return t;
 }
-function derivByServ(periods,docKey){
+function derivByServ(periods,docKey,servFilter){
   var map={};
   periods.forEach(function(p){
     var d=_docs[p];if(!d)return;
     (d.derivantes||[]).forEach(function(it){
       if(normKey(it.n)!==docKey)return;
+      if(servFilter&&normKey(it.s)!==servFilter)return;
       sumInto(map,it.s||"(sin servicio)",it.c);
     });
   });
   return mapToArr(map);
 }
-function derivMonthly(periods,docKey){
+function derivMonthly(periods,docKey,servFilter){
   return periods.map(function(p){
     var t=0,d=_docs[p];
-    if(d)(d.derivantes||[]).forEach(function(it){if(normKey(it.n)===docKey)t+=it.c;});
+    if(d)(d.derivantes||[]).forEach(function(it){
+      if(normKey(it.n)===docKey&&(!servFilter||normKey(it.s)===servFilter))t+=it.c;
+    });
     return t;
   });
 }
-function derivRankPos(periods,docKey){
-  var arr=derivAggInPeriods(periods),pos=0;
+function derivPractTop(periods,docKey,servKey,topN){
+  var map={};
+  periods.forEach(function(p){
+    var d=_docs[p];if(!d)return;
+    (d.derivPract||[]).forEach(function(it){
+      if(normKey(it.d)!==docKey)return;
+      if(servKey&&normKey(it.s)!==servKey)return;
+      sumInto(map,it.n,it.c);
+    });
+  });
+  return mapToArr(map).slice(0,topN||15);
+}
+function derivRankPos(periods,docKey,servFilter){
+  var arr=derivAggInPeriods(periods,servFilter),pos=0;
   for(var i=0;i<arr.length;i++){if(normKey(arr[i].n)===docKey){pos=i+1;break;}}
   return {pos:pos,total:arr.length};
 }
@@ -1420,6 +1464,31 @@ function dashServQuick(on){
   all.forEach(function(s){_dashServFilter[normKey(s.n)]=on;});
   renderDash();
 }
+function dashPeriodQuick(mode){
+  var periods=sortedPeriods();
+  if(!periods.length)return;
+  var desdeEl=$("dashDesde"),hastaEl=$("dashHasta");
+  if(!desdeEl||!hastaEl)return;
+  var curY=String(new Date().getFullYear());
+  var prevY=String(new Date().getFullYear()-1);
+  var yp,d,h;
+  if(mode==="year"){
+    yp=periods.filter(function(p){return p.substring(0,4)===curY;});
+    d=yp.length?yp[0]:periods[0];
+    h=yp.length?yp[yp.length-1]:periods[periods.length-1];
+  }else if(mode==="prev"){
+    yp=periods.filter(function(p){return p.substring(0,4)===prevY;});
+    d=yp.length?yp[0]:periods[0];
+    h=yp.length?yp[yp.length-1]:periods[periods.length-1];
+  }else if(mode==="12"){
+    d=periods.length>=12?periods[periods.length-12]:periods[0];
+    h=periods[periods.length-1];
+  }else{
+    d=periods[0];h=periods[periods.length-1];
+  }
+  desdeEl.value=d;hastaEl.value=h;
+  renderDash();
+}
 function renderDash(){
   var periods=sortedPeriods();
   var has=periods.length>0;
@@ -1428,18 +1497,24 @@ function renderDash(){
   $("dashSub").textContent=has?(periods.length+" meses cargados · "+periodLabel(periods[0])+" a "+periodLabel(periods[periods.length-1])):"Sin datos cargados todavía.";
   if(!has)return;
 
-  /* ── Período ── */
-  var sel=$("dashPeriod");
-  var prev=sel.value;
-  var opts='<option value="__all">Todos los períodos</option>';
-  for(var i=periods.length-1;i>=0;i--){
-    opts+='<option value="'+escAttr(periods[i])+'">'+escHtml(periodLabel(periods[i]))+'</option>';
+  /* ── Período (Desde / Hasta) ── */
+  var desdeEl=$("dashDesde"),hastaEl=$("dashHasta");
+  var prevDesde=desdeEl?desdeEl.value:"";
+  var prevHasta=hastaEl?hastaEl.value:"";
+  var periodOpts="";
+  for(var i=0;i<periods.length;i++){
+    periodOpts+='<option value="'+escAttr(periods[i])+'">'+escHtml(periodLabel(periods[i]))+'</option>';
   }
-  sel.innerHTML=opts;
-  if(prev&&(prev==="__all"||_docs[prev]))sel.value=prev;
-  else sel.value=periods[periods.length-1];
-  var selPeriods=sel.value==="__all"?periods:[sel.value];
-  var scopeLabel=sel.value==="__all"?"todos los períodos":periodLabel(sel.value);
+  if(desdeEl)desdeEl.innerHTML=periodOpts;
+  if(hastaEl)hastaEl.innerHTML=periodOpts;
+  if(desdeEl){desdeEl.value=(prevDesde&&_docs[prevDesde])?prevDesde:periods[0];}
+  if(hastaEl){hastaEl.value=(prevHasta&&_docs[prevHasta])?prevHasta:periods[periods.length-1];}
+  var desdeV=desdeEl?desdeEl.value:periods[0];
+  var hastaV=hastaEl?hastaEl.value:periods[periods.length-1];
+  if(desdeV>hastaV){hastaV=desdeV;if(hastaEl)hastaEl.value=hastaV;}
+  var selPeriods=periods.filter(function(p){return p>=desdeV&&p<=hastaV;});
+  if(!selPeriods.length)selPeriods=[periods[periods.length-1]];
+  var scopeLabel=desdeV===hastaV?periodLabel(desdeV):(periodLabel(desdeV)+" — "+periodLabel(hastaV));
 
   /* ── Año de comparación ── */
   var cmpSel=$("dashCmpYear");
@@ -1504,8 +1579,8 @@ function renderDash(){
     options:{plugins:{legend:{display:false}},scales:{x:baseGrid(),y:baseGrid()}}
   });
 
-  /* ── Línea: evolución últimos 12 + comparación año anterior ── */
-  var evo=periods.slice(-12);
+  /* ── Línea: evolución del período seleccionado + comparación ── */
+  var evo=selPeriods;
   function evoTotalForPeriod(p){
     var d=_docs[p];if(!d)return 0;
     if(!servFilt)return d.total||0;
@@ -1533,7 +1608,7 @@ function renderDash(){
       borderDash:[6,3],spanGaps:false
     });
   }
-  var evoSubText="Últimos 12 períodos"+(cmpYear?" · comparado con "+cmpYear:"");
+  var evoSubText=escHtml(scopeLabel)+(cmpYear?" · comparado con "+cmpYear:"");
   if($("dashEvoSub"))$("dashEvoSub").textContent=evoSubText;
   mkChart("chEvo",{type:"line",
     data:{labels:evo.map(periodShort),datasets:evoDsets},
@@ -1798,7 +1873,7 @@ function procesarImport(){
       var period=map.fecha>=0?rowPeriod(row[map.fecha],map.anio>=0?row[map.anio]:null,fallback):fallback;
       if(!period){skipped++;continue;}
       if(!byPeriod[period]){
-        byPeriod[period]={total:0,rows:0,serv:{},centros:{},servCentro:{},obras:{},pract:{},deriv:{},equip:{}};
+        byPeriod[period]={total:0,rows:0,serv:{},centros:{},servCentro:{},obras:{},pract:{},deriv:{},equip:{},derivPract:{}};
       }
       var agg=byPeriod[period];
       agg.total+=qty;agg.rows++;
@@ -1819,6 +1894,14 @@ function procesarImport(){
       if(map.derivante>=0){
         var de=String(row[map.derivante]||"").trim();
         if(de)sumInto(agg.deriv,serv+" ||| "+de,qty);
+        if(de&&map.practica>=0){
+          var dpPr=String(row[map.practica]||"").trim();
+          if(dpPr){
+            var dpK=de+"\t"+serv+"\t"+dpPr;
+            if(!agg.derivPract[dpK])agg.derivPract[dpK]={d:de,s:serv,n:dpPr,c:0};
+            agg.derivPract[dpK].c+=qty;
+          }
+        }
       }
       if(map.equipo>=0){
         var eq=String(row[map.equipo]||"").trim();
@@ -1867,6 +1950,7 @@ function finalizarImport(byPeriod,skipped){
       practicas:splitArr(a.pract,1500),
       derivantes:splitArr(a.deriv,2000),
       equipos:splitArr(a.equip,300),
+      derivPract:(function(){var dp=[];for(var dpk in a.derivPract)dp.push(a.derivPract[dpk]);dp.sort(function(x,y){return y.c-x.c;});return dp.slice(0,2000);})(),
       meta:{importedAt:new Date().toISOString(),importedBy:currentUser?currentUser.email:"",fileName:_fileName,rows:a.rows}
     };
   });
@@ -2086,6 +2170,24 @@ function toggleFavDeriv(name){
   }).then(function(){toast(found?"☆ Quitado de favoritos":"⭐ Agregado a favoritos");})
     .catch(function(e){toast("⚠️ Error: "+e.message);});
 }
+function setDerivServFilter(sk){
+  _derivServFilter=sk;
+  renderDerivServChips();
+}
+function renderDerivServChips(){
+  var el=$("derivServChips");
+  var allBtn=$("derivServAll");
+  if(!el)return;
+  var servs=allServicios();
+  var html="";
+  servs.forEach(function(s){
+    var k=normKey(s.n);
+    var on=_derivServFilter===k;
+    html+='<button class="chip-btn'+(on?" chip-on":"")+'" onclick="setDerivServFilter('+(on?'null':'"'+escAttr(k)+'"')+')">'+escHtml(s.n)+'</button>';
+  });
+  el.innerHTML=html;
+  if(allBtn)allBtn.className="chip-btn"+(_derivServFilter===null?" chip-on":"");
+}
 function renderDerivFilters(){
   if(!$("listPeriodsDeriv"))return;
   var periods=sortedPeriods();
@@ -2095,6 +2197,7 @@ function renderDerivFilters(){
   }
   buildCheckList("listPeriodsDeriv",pItems,true);
   renderMedicosList();
+  renderDerivServChips();
 }
 function renderMedicosList(){
   var el=$("listMedicos");if(!el)return;
@@ -2606,12 +2709,14 @@ function buildDerivReport(selP,selDocs){
     comparativa:$("derivComparativa").checked
   };
   var nRank=clampNum("topRankDeriv",20);
-  var rangeLabel=selP.length===1?periodLabel(selP[0]):periodLabel(selP[0])+" — "+periodLabel(selP[selP.length-1]);
+  var servFiltKey=_derivServFilter;
+  var servFiltLabel=servFiltKey?(function(){var all=allServicios();for(var i=0;i<all.length;i++){if(normKey(all[i].n)===servFiltKey)return all[i].n;}return servFiltKey;}()):"";
+  var rangeLabel=(selP.length===1?periodLabel(selP[0]):periodLabel(selP[0])+" — "+periodLabel(selP[selP.length-1]))+(_derivServFilter?" · "+allServicios().reduce(function(acc,s){return normKey(s.n)===_derivServFilter?s.n:acc;},""):"");
   var logo=getLogoDataURL();
   var fechaStr=new Date().toLocaleDateString("es-AR")+" "+new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
   var userStr=currentUser?(currentUser.displayName||currentUser.email):"";
-  var instTotal=totalDerivAll(selP);
-  var allArr=derivAggInPeriods(selP);
+  var instTotal=totalDerivAll(selP,servFiltKey);
+  var allArr=derivAggInPeriods(selP,servFiltKey);
   var medCount=opts.ranking?allArr.length:selDocs.length;
 
   var pages=[],toc=[],secNum=0;
@@ -2695,9 +2800,9 @@ function buildDerivReport(selP,selDocs){
   if(opts.porMedico){
     selDocs.forEach(function(name,di){
       var k=normKey(name);
-      var byServ=derivByServ(selP,k);
+      var byServ=derivByServ(selP,k,servFiltKey);
       var docTotal=0;byServ.forEach(function(x){docTotal+=x.c;});
-      var rp=derivRankPos(selP,k);
+      var rp=derivRankPos(selP,k,servFiltKey);
       var body5='<div class="rpt-kpis">'+
         kpiBox("Derivaciones totales",fmtN(docTotal))+
         kpiBox("% de la institución",fmtPct(instTotal?docTotal/instTotal:0))+
@@ -2718,22 +2823,24 @@ function buildDerivReport(selP,selDocs){
             selP.forEach(function(p){servTotal+=getMonthlyServ(p,x.n);});
             return [escHtml(x.n),fmtN(x.c),fmtPct(docTotal?x.c/docTotal:0),fmtPct(servTotal?x.c/servTotal:0)];
           }));
-        /* Prácticas top por cada servicio derivado */
+        /* Prácticas derivadas por este médico, por servicio */
         if(byServ.length){
           body5+='<div class="rpt-h3">Estudios derivados por servicio</div>';
-          byServ.forEach(function(sv,si){
-            var pract=getPracticasTop(selP,sv.n,10);
+          byServ.forEach(function(sv){
+            var pract=derivPractTop(selP,k,normKey(sv.n),10);
             if(!pract.length)return;
-            // Filter to only practices where this doctor derives — approximate via all practices of the service
             body5+='<div style="font-size:10.5pt;font-weight:760;color:#1a3a6b;margin:8px 0 4px;">'+escHtml(sv.n)+'</div>';
-            body5+=rptTable([{t:"Práctica / Estudio (top del servicio)"},{t:"Total servicio",r:1}],
+            body5+=rptTable([{t:"Práctica / Estudio derivada"},{t:"Derivaciones",r:1}],
               pract.map(function(x){return [escHtml(x.n),fmtN(x.c)];}));
           });
+          if(!byServ.some(function(sv){return derivPractTop(selP,k,normKey(sv.n),1).length>0;})){
+            body5+='<div class="rpt-note">Prácticas por médico no disponibles — reimportá el Excel para habilitar este desglose.</div>';
+          }
         }
         if(opts.evolucion&&selP.length>1){
           body5+='<div class="rpt-h3">Evolución mensual</div>';
           body5+=chartImg({type:"line",data:{labels:selP.map(periodShort),
-            datasets:[{label:name,data:derivMonthly(selP,k),borderColor:PALETTE[di%PALETTE.length],backgroundColor:"rgba(26,58,107,.08)",fill:true,tension:.35,pointRadius:4,pointBackgroundColor:PALETTE[di%PALETTE.length],borderWidth:2.5}]},
+            datasets:[{label:name,data:derivMonthly(selP,k,servFiltKey),borderColor:PALETTE[di%PALETTE.length],backgroundColor:"rgba(26,58,107,.08)",fill:true,tension:.35,pointRadius:4,pointBackgroundColor:PALETTE[di%PALETTE.length],borderWidth:2.5}]},
             options:{plugins:{legend:{display:false}},scales:{x:rptGrid(),y:rptGrid()}}},900,250);
         }
         /* Comparativa contra otros médicos seleccionados en el mismo servicio principal */
@@ -2742,7 +2849,7 @@ function buildDerivReport(selP,selDocs){
           var compPeers=[];
           selDocs.forEach(function(peerName){
             if(normKey(peerName)===k)return;
-            var peerByServ=derivByServ(selP,normKey(peerName));
+            var peerByServ=derivByServ(selP,normKey(peerName),servFiltKey);
             var peerInServ=0;
             peerByServ.forEach(function(x){if(normKey(x.n)===normKey(mainServ))peerInServ+=x.c;});
             var peerTotal=0;peerByServ.forEach(function(x){peerTotal+=x.c;});
@@ -2973,10 +3080,33 @@ function calcCapacityForPeriod(cfg,year,month){
   return capDia*getWorkingDaysInMonth(year,month,ds,cfg.n||"");
 }
 
+function renderEquiposFilter(){
+  var bar=$("equipFilterBar");
+  var chipsEl=$("equipServChips");
+  if(!bar||!chipsEl)return;
+  var allServEquip={};
+  sortedPeriods().forEach(function(p){
+    var d=_docs[p];if(!d)return;
+    (d.equipos||[]).forEach(function(it){if(it.s)allServEquip[normKey(it.s)]={n:it.s,k:normKey(it.s)};});
+  });
+  var servList=[];for(var k in allServEquip)servList.push(allServEquip[k]);
+  servList.sort(function(a,b){return a.n.localeCompare(b.n);});
+  if(!servList.length){bar.style.display="none";return;}
+  bar.style.display="flex";
+  var ch='<button class="chip-btn'+(_equipServFilter===null?" chip-on":"")+'" onclick="_equipServFilter=null;renderEquipos()">Todos</button>';
+  servList.forEach(function(s){
+    var on=_equipServFilter===s.k;
+    ch+='<button class="chip-btn'+(on?" chip-on":"")+'" onclick="_equipServFilter=\''+escAttr(s.k)+'\';renderEquipos()">'+escHtml(s.n)+'</button>';
+  });
+  chipsEl.innerHTML=ch;
+}
 function renderEquipos(){
   var el=$("equiposList");if(!el)return;
+  renderEquiposFilter();
   var periods=sortedPeriods();
-  var eqs=getEquipos(periods,null);
+  var servFilt=null;
+  if(_equipServFilter){servFilt={};servFilt[_equipServFilter]=1;}
+  var eqs=getEquipos(periods,servFilt);
   var btnSave=$("btnSaveEquipos");
   if(btnSave)btnSave.style.display=eqs.length?"inline-flex":"none";
   if(!eqs.length){
