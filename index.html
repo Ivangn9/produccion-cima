@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<!-- v1.0.5 -->
+<!-- v1.0.6 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="app-version" content="v1.0.5">
+<meta name="app-version" content="v1.0.6">
 <title>Producción CIMA · Control de Producción</title>
 <link rel="preconnect" href="https://www.gstatic.com">
 <link rel="preconnect" href="https://cdn.sheetjs.com">
@@ -648,9 +648,15 @@ input,select,textarea{font-family:inherit;color:var(--text);}
         </div>
       </div>
 
-      <div class="card-solid" style="padding:18px;">
+      <div class="card-solid" style="padding:18px;margin-bottom:16px;">
         <h3 style="margin:0 0 10px;font-size:15px;font-weight:760;">🗂 Meses cargados</h3>
         <div id="histList" style="font-size:13px;color:var(--text3);">Cargando…</div>
+      </div>
+
+      <div class="card-solid" style="padding:18px;">
+        <h3 style="margin:0 0 4px;font-size:15px;font-weight:760;">🗑 Papelera</h3>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Los datos eliminados o reemplazados se guardan acá y se pueden restaurar. Se borran solos a los 20 días.</div>
+        <div id="trashList" style="font-size:13px;color:var(--text3);">La papelera está vacía.</div>
       </div>
     </div>
 
@@ -716,6 +722,50 @@ input,select,textarea{font-family:inherit;color:var(--text);}
       </div>
     </div>
 
+    <!-- ─── Vista: Médicos derivantes ─── -->
+    <div class="view" id="view-derivantes">
+      <div class="section-title">🩺 Informe por médico derivante</div>
+      <div class="section-sub">Estadística de derivación de cada médico: cuánto derivó a la institución, por servicio y mes. Marcá médicos como favoritos (⭐) para tenerlos siempre preseleccionados, o generá el ranking general.</div>
+      <div class="grid-2">
+        <div class="card-solid filter-card">
+          <h3>🗓 Períodos a incluir</h3>
+          <div class="quick-row">
+            <button class="chip-btn" onclick="quickPeriodsD('last')">Último mes</button>
+            <button class="chip-btn" onclick="quickPeriodsD('12')">Últimos 12</button>
+            <button class="chip-btn" onclick="quickPeriodsD('year')">Año actual</button>
+            <button class="chip-btn" onclick="quickPeriodsD('all')">Todos</button>
+            <button class="chip-btn" onclick="quickPeriodsD('none')">Ninguno</button>
+          </div>
+          <input class="inp filter-search" placeholder="🔍 Buscar período…" oninput="filterCheckList('listPeriodsDeriv',this.value)">
+          <div class="check-list" id="listPeriodsDeriv"></div>
+        </div>
+        <div class="card-solid filter-card">
+          <h3>👨‍⚕️ Médicos derivantes</h3>
+          <div class="quick-row">
+            <button class="chip-btn" onclick="medicosQuick('fav')">⭐ Solo favoritos</button>
+            <button class="chip-btn" onclick="medicosQuick('all')">Todos</button>
+            <button class="chip-btn" onclick="medicosQuick('none')">Ninguno</button>
+          </div>
+          <input class="inp filter-search" placeholder="🔍 Buscar médico…" oninput="filterCheckList('listMedicos',this.value)">
+          <div class="check-list" id="listMedicos"></div>
+        </div>
+        <div class="card-solid filter-card">
+          <h3>🎛 Contenido del informe</h3>
+          <div class="switch-row"><span class="sw-label">Ranking general de todos los derivantes</span><label class="toggle"><input type="checkbox" id="derivRanking"><span class="tg-track"></span><span class="tg-knob"></span></label></div>
+          <div class="num-row">
+            <div><div class="nr-label">Derivantes en el ranking</div><div class="nr-sub">Cuántos mostrar (top N)</div></div>
+            <input type="number" class="inp inp-num" id="topRankDeriv" value="20" min="1" max="60">
+          </div>
+          <div class="switch-row"><span class="sw-label">Ficha individual por médico elegido</span><label class="toggle"><input type="checkbox" id="derivPorMedico" checked><span class="tg-track"></span><span class="tg-knob"></span></label></div>
+          <div class="switch-row"><span class="sw-label">Evolución mensual (líneas)</span><label class="toggle"><input type="checkbox" id="derivEvolucion" checked><span class="tg-track"></span><span class="tg-knob"></span></label></div>
+          <div class="switch-row"><span class="sw-label">Comparativa entre médicos elegidos</span><label class="toggle"><input type="checkbox" id="derivComparativa" checked><span class="tg-track"></span><span class="tg-knob"></span></label></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:center;margin-top:20px;">
+        <button class="btn btn-primary btn-big" onclick="generarInformeDeriv()">📄 Generar informe de derivantes</button>
+      </div>
+    </div>
+
     <!-- ─── Vista: Equipos ─── -->
     <div class="view" id="view-equipos">
       <div class="section-title">🛠 Equipos y capacidad</div>
@@ -771,6 +821,9 @@ input,select,textarea{font-family:inherit;color:var(--text);}
     <button class="tab" data-tab="informe" onclick="setView('informe')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
       Informe</button>
+    <button class="tab" data-tab="derivantes" onclick="setView('derivantes')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Médicos</button>
     <button class="tab" data-tab="equipos" onclick="setView('equipos')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h0a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       Equipos</button>
@@ -830,8 +883,8 @@ input,select,textarea{font-family:inherit;color:var(--text);}
    meta app-version y el comentario <!-- vX.Y.Z --> de la línea 2.
    ═══════════════════════════════════════════ */
 var APP_VERSION=(document.querySelector('meta[name="app-version"]')||{}).content||"";
-var APP_DISPLAY_VERSION="1.0.5";
-var APP_BUILD="15/06/26 10:00";
+var APP_DISPLAY_VERSION="1.0.6";
+var APP_BUILD="15/06/26 14:30";
 function doUpdate(){
   toast("⚡ Actualizando...");
   setTimeout(function(){
@@ -892,11 +945,15 @@ var ADMIN_EMAIL="ivangarcian@gmail.com";
 var DB_DATA="produccion_cima";
 var DB_USERS="produccion_users";
 var DB_CONFIG="produccion_config";
+var DB_TRASH="produccion_trash";
+var TRASH_DAYS=20;
 
 var currentUser=null,isAdmin=false,_accessSeq=0;
 var _docs={};           // period "YYYY-MM" -> doc data
 var _equipCfg={};       // normKey(equipo) -> {n,s,cap}
-var _unsubData=null,_unsubUsers=null,_unsubCfg=null;
+var _favDeriv=[];       // nombres de médicos favoritos
+var _trash={};          // id papelera -> {type,period,label,data,deletedAt,...}
+var _unsubData=null,_unsubUsers=null,_unsubCfg=null,_unsubFav=null,_unsubTrash=null;
 var _lastUsers=[];
 
 var MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -975,6 +1032,8 @@ function _stopListeners(){
   if(_unsubData){_unsubData();_unsubData=null;}
   if(_unsubUsers){_unsubUsers();_unsubUsers=null;}
   if(_unsubCfg){_unsubCfg();_unsubCfg=null;}
+  if(_unsubFav){_unsubFav();_unsubFav=null;}
+  if(_unsubTrash){_unsubTrash();_unsubTrash=null;}
 }
 function showLogin(unauthorized){
   $("bootLoader").style.display="none";
@@ -1102,6 +1161,16 @@ function startListeners(){
     }
     renderEquipos();
   });
+  if(_unsubFav)_unsubFav();
+  _unsubFav=_db.collection(DB_CONFIG).doc("derivantes_fav").onSnapshot(function(d){
+    _favDeriv=(d.exists&&(d.data()||{}).items)||[];
+    renderMedicosList();
+  },function(){});
+  if(_unsubTrash)_unsubTrash();
+  _unsubTrash=_db.collection(DB_TRASH).onSnapshot(function(snap){
+    _trash={};snap.forEach(function(d){_trash[d.id]=d.data();});
+    purgeTrash();renderTrash();
+  },function(){});
   if(isAdmin)startUsersListener();
   if(!window._updTimer)window._updTimer=setInterval(checkForUpdates,60*1000);
 }
@@ -1112,6 +1181,7 @@ function afterDataChange(){
   renderDash();
   renderHist();
   renderInformeFilters();
+  renderDerivFilters();
   renderEquipos();
 }
 
@@ -1223,6 +1293,43 @@ function allCentros(){
     (_docs[p].centros||[]).forEach(function(it){sumInto(map,it.n,it.c);});
   });
   return mapToArr(map);
+}
+/* ═══ Agregadores por médico derivante (cruzando todos los servicios) ═══ */
+function derivAggInPeriods(periods){
+  var map={};
+  periods.forEach(function(p){
+    var d=_docs[p];if(!d)return;
+    (d.derivantes||[]).forEach(function(it){sumInto(map,it.n,it.c);});
+  });
+  return mapToArr(map); // [{n,c}] ordenado desc
+}
+function allDerivantes(){return derivAggInPeriods(sortedPeriods());}
+function totalDerivAll(periods){
+  var t=0;periods.forEach(function(p){var d=_docs[p];if(d)(d.derivantes||[]).forEach(function(it){t+=it.c;});});
+  return t;
+}
+function derivByServ(periods,docKey){
+  var map={};
+  periods.forEach(function(p){
+    var d=_docs[p];if(!d)return;
+    (d.derivantes||[]).forEach(function(it){
+      if(normKey(it.n)!==docKey)return;
+      sumInto(map,it.s||"(sin servicio)",it.c);
+    });
+  });
+  return mapToArr(map);
+}
+function derivMonthly(periods,docKey){
+  return periods.map(function(p){
+    var t=0,d=_docs[p];
+    if(d)(d.derivantes||[]).forEach(function(it){if(normKey(it.n)===docKey)t+=it.c;});
+    return t;
+  });
+}
+function derivRankPos(periods,docKey){
+  var arr=derivAggInPeriods(periods),pos=0;
+  for(var i=0;i<arr.length;i++){if(normKey(arr[i].n)===docKey){pos=i+1;break;}}
+  return {pos:pos,total:arr.length};
 }
 /* ═══════════════════════════════════════════
    NAVEGACIÓN
@@ -1681,11 +1788,22 @@ function guardarImport(){
   var overwrites=periods.filter(function(p){return !!_docs[p];});
   var doSave=function(){
     var btn=$("btnGuardarImport");btn.disabled=true;
-    var batch=_db.batch();
-    periods.forEach(function(p){
-      batch.set(_db.collection(DB_DATA).doc(p),_pendingAgg[p]);
+    // Respaldar a la papelera los meses que se van a reemplazar (no se pierden datos)
+    var backup=_db.batch();
+    overwrites.forEach(function(p){
+      if(!_docs[p])return;
+      backup.set(_db.collection(DB_TRASH).doc(),{
+        type:"period",period:p,label:periodLabel(p),data:_docs[p],
+        deletedAt:new Date().toISOString(),deletedBy:currentUser?currentUser.email:"",reason:"overwrite"
+      });
     });
-    batch.commit().then(function(){
+    backup.commit().catch(function(){}).then(function(){
+      var batch=_db.batch();
+      periods.forEach(function(p){
+        batch.set(_db.collection(DB_DATA).doc(p),_pendingAgg[p]);
+      });
+      return batch.commit();
+    }).then(function(){
       toast("✓ Guardado: "+periods.map(periodLabel).join(", "));
       cancelImport();btn.disabled=false;
       setView("dash");
@@ -1713,10 +1831,64 @@ function renderHist(){
   el.innerHTML=html;
 }
 function deletePeriod(p){
-  openConfirm("Eliminar período","¿Eliminar los datos de "+periodLabel(p)+"? Esta acción no se puede deshacer.",function(){
-    _db.collection(DB_DATA).doc(p).delete().then(function(){
-      toast("✓ Eliminado "+periodLabel(p));
+  openConfirm("Mover a la papelera","¿Mover los datos de "+periodLabel(p)+" a la papelera? Vas a poder restaurarlos durante "+TRASH_DAYS+" días antes de que se borren solos.",function(){
+    var d=_docs[p];
+    if(!d){toast("⚠️ No se encontró el período");return;}
+    _db.collection(DB_TRASH).add({
+      type:"period",period:p,label:periodLabel(p),data:d,
+      deletedAt:new Date().toISOString(),deletedBy:currentUser?currentUser.email:"",reason:"manual"
+    }).then(function(){
+      return _db.collection(DB_DATA).doc(p).delete();
+    }).then(function(){
+      toast("🗑 "+periodLabel(p)+" movido a la papelera");
     }).catch(function(e){toast("⚠️ Error: "+e.message);});
+  });
+}
+
+/* ═══════════════════════════════════════════
+   PAPELERA (borrado reversible + purga a los 20 días)
+   ═══════════════════════════════════════════ */
+function purgeTrash(){
+  var cutoff=Date.now()-TRASH_DAYS*86400000;
+  for(var id in _trash){
+    var ts=_trash[id].deletedAt?Date.parse(_trash[id].deletedAt):0;
+    if(ts&&ts<cutoff)_db.collection(DB_TRASH).doc(id).delete().catch(function(){});
+  }
+}
+function renderTrash(){
+  var el=$("trashList");if(!el)return;
+  var ids=Object.keys(_trash);
+  if(!ids.length){el.innerHTML='<p style="font-size:13px;color:var(--text3)">La papelera está vacía.</p>';return;}
+  ids.sort(function(a,b){return Date.parse(_trash[b].deletedAt||0)-Date.parse(_trash[a].deletedAt||0);});
+  var html="";
+  ids.forEach(function(id){
+    var t=_trash[id],ts=t.deletedAt?Date.parse(t.deletedAt):0;
+    var daysLeft=ts?Math.max(0,Math.ceil((ts+TRASH_DAYS*86400000-Date.now())/86400000)):TRASH_DAYS;
+    var dt=t.data||{};
+    var reason=t.reason==="overwrite"?"reemplazado":"eliminado";
+    html+='<div class="hist-row"><span class="hist-period">'+escHtml(t.label||t.period||"—")+'</span>'+
+      '<span class="hist-meta">'+fmtN(dt.total||0)+' estudios · '+((dt.servicios||[]).length)+' servicios · '+reason+
+      (ts?' '+new Date(ts).toLocaleDateString("es-AR"):'')+' · se borra en '+daysLeft+' día'+(daysLeft===1?"":"s")+'</span>'+
+      '<button class="btn btn-secondary btn-sm" onclick="restoreTrash(\''+escAttr(id)+'\')">Restaurar</button>'+
+      '<button class="btn btn-danger btn-sm" onclick="purgeTrashItem(\''+escAttr(id)+'\')">Borrar ya</button></div>';
+  });
+  el.innerHTML=html;
+}
+function restoreTrash(id){
+  var t=_trash[id];if(!t){toast("⚠️ No encontrado");return;}
+  var p=t.period;
+  var doRestore=function(){
+    _db.collection(DB_DATA).doc(p).set(t.data).then(function(){
+      return _db.collection(DB_TRASH).doc(id).delete();
+    }).then(function(){toast("✓ Restaurado "+(t.label||p));}).catch(function(e){toast("⚠️ Error: "+e.message);});
+  };
+  if(_docs[p])openConfirm("Restaurar","Ya hay datos cargados para "+(t.label||p)+". Al restaurar se reemplazan por los de la papelera. ¿Continuar?",doRestore);
+  else doRestore();
+}
+function purgeTrashItem(id){
+  var t=_trash[id]||{};
+  openConfirm("Borrar definitivamente","Vas a eliminar para siempre el respaldo de "+(t.label||"este elemento")+". Esta acción no se puede deshacer. ¿Continuar?",function(){
+    _db.collection(DB_TRASH).doc(id).delete().then(function(){toast("🗑 Borrado definitivo");}).catch(function(e){toast("⚠️ Error: "+e.message);});
   });
 }
 /* ═══════════════════════════════════════════
@@ -1779,6 +1951,85 @@ function quickPeriods(mode){
     periods.forEach(function(p){if(p.indexOf(y)===0)keep[p]=1;});
   }else if(mode==="all")periods.forEach(function(p){keep[p]=1;});
   var inputs=$("listPeriods").querySelectorAll("input");
+  for(var i=0;i<inputs.length;i++)inputs[i].checked=!!keep[inputs[i].value];
+}
+
+/* ═══════════════════════════════════════════
+   FILTROS DEL INFORME POR DERIVANTE
+   ═══════════════════════════════════════════ */
+function isFavDeriv(name){
+  var k=normKey(name);
+  for(var i=0;i<_favDeriv.length;i++){if(normKey(_favDeriv[i])===k)return true;}
+  return false;
+}
+function toggleFavDeriv(name){
+  var k=normKey(name),arr=[],found=false;
+  for(var i=0;i<_favDeriv.length;i++){
+    if(normKey(_favDeriv[i])===k){found=true;}else{arr.push(_favDeriv[i]);}
+  }
+  if(!found)arr.push(name);
+  _db.collection(DB_CONFIG).doc("derivantes_fav").set({
+    items:arr,updatedAt:new Date().toISOString(),updatedBy:currentUser?currentUser.email:""
+  }).then(function(){toast(found?"☆ Quitado de favoritos":"⭐ Agregado a favoritos");})
+    .catch(function(e){toast("⚠️ Error: "+e.message);});
+}
+function renderDerivFilters(){
+  if(!$("listPeriodsDeriv"))return;
+  var periods=sortedPeriods();
+  var pItems=[];
+  for(var i=periods.length-1;i>=0;i--){
+    pItems.push({v:periods[i],label:periodLabel(periods[i]),count:getMonthlyTotal(periods[i])});
+  }
+  buildCheckList("listPeriodsDeriv",pItems,true);
+  renderMedicosList();
+}
+function renderMedicosList(){
+  var el=$("listMedicos");if(!el)return;
+  var had=el.getAttribute("data-init")==="1";
+  var prev={};
+  var inputs=el.querySelectorAll("input");
+  for(var i=0;i<inputs.length;i++)prev[inputs[i].value]=inputs[i].checked;
+  var arr=allDerivantes();
+  // Favoritos primero, luego por volumen
+  arr.sort(function(a,b){
+    var fa=isFavDeriv(a.n)?1:0,fb=isFavDeriv(b.n)?1:0;
+    if(fa!==fb)return fb-fa;
+    return b.c-a.c;
+  });
+  var html="";
+  arr.forEach(function(it){
+    var fav=isFavDeriv(it.n);
+    // Si ya existía: respetar selección previa. Si es nuevo: preseleccionar solo si es favorito.
+    var checked=had?(it.n in prev?prev[it.n]:fav):fav;
+    html+='<label class="check-item" data-search="'+escAttr(stripAcc(it.n).toLowerCase())+'">'+
+      '<input type="checkbox" value="'+escAttr(it.n)+'"'+(checked?" checked":"")+'>'+
+      '<span style="flex:1;">'+escHtml(it.n)+'</span>'+
+      '<span class="ci-count">'+fmtN(it.c)+'</span>'+
+      '<span onclick="event.preventDefault();event.stopPropagation();toggleFavDeriv(\''+escAttr(it.n)+'\')" title="Favorito" style="cursor:pointer;font-size:15px;margin-left:8px;line-height:1;">'+(fav?"⭐":"☆")+'</span>'+
+      '</label>';
+  });
+  el.innerHTML=html||'<p style="font-size:12.5px;color:var(--text3);padding:10px 14px;">Sin derivantes cargados todavía. Importá un Excel mapeando la columna Médico-derivante.</p>';
+  el.setAttribute("data-init","1");
+}
+function medicosQuick(mode){
+  var items=$("listMedicos").querySelectorAll(".check-item");
+  for(var i=0;i<items.length;i++){
+    if(items[i].style.display==="none")continue;
+    var inp=items[i].querySelector("input");
+    if(mode==="all")inp.checked=true;
+    else if(mode==="none")inp.checked=false;
+    else if(mode==="fav")inp.checked=isFavDeriv(inp.value);
+  }
+}
+function quickPeriodsD(mode){
+  var periods=sortedPeriods(),keep={};
+  if(mode==="last"&&periods.length)keep[periods[periods.length-1]]=1;
+  else if(mode==="12")periods.slice(-12).forEach(function(p){keep[p]=1;});
+  else if(mode==="year"){
+    var y=String(new Date().getFullYear());
+    periods.forEach(function(p){if(p.indexOf(y)===0)keep[p]=1;});
+  }else if(mode==="all")periods.forEach(function(p){keep[p]=1;});
+  var inputs=$("listPeriodsDeriv").querySelectorAll("input");
   for(var i=0;i<inputs.length;i++)inputs[i].checked=!!keep[inputs[i].value];
 }
 
@@ -2205,6 +2456,182 @@ function buildReport(selP,selS){
     html+='<div class="rpt-page'+(isCover?' rpt-cover':'')+'">'+pg+foot+'</div>';
   });
   openReport(html,"Informe de Producción · "+rangeLabel);
+}
+
+/* ═══════════════════════════════════════════
+   GENERADOR DE INFORME POR DERIVANTE
+   ═══════════════════════════════════════════ */
+function generarInformeDeriv(_attempt){
+  if(typeof Chart==="undefined"){
+    if((_attempt||0)===0)toast("⏳ Preparando gráficos…");
+    if((_attempt||0)>=8){toast("⚠️ No se pudo cargar Chart.js — revisá la conexión");return;}
+    setTimeout(function(){generarInformeDeriv((_attempt||0)+1);},400);
+    return;
+  }
+  var selP=getChecked("listPeriodsDeriv").sort();
+  if(!selP.length){toast("⚠️ Elegí al menos un período");return;}
+  var ranking=$("derivRanking").checked;
+  var selDocs=getChecked("listMedicos");
+  if(!ranking&&!selDocs.length){toast("⚠️ Elegí al menos un médico o activá el ranking general");return;}
+  toast("⏳ Generando informe…");
+  setTimeout(function(){
+    try{buildDerivReport(selP,selDocs);}
+    catch(e){toast("⚠️ Error generando informe: "+(e.message||e));}
+  },60);
+}
+
+function buildDerivReport(selP,selDocs){
+  var opts={
+    ranking:$("derivRanking").checked,
+    porMedico:$("derivPorMedico").checked,
+    evolucion:$("derivEvolucion").checked,
+    comparativa:$("derivComparativa").checked
+  };
+  var nRank=clampNum("topRankDeriv",20);
+  var rangeLabel=selP.length===1?periodLabel(selP[0]):periodLabel(selP[0])+" — "+periodLabel(selP[selP.length-1]);
+  var logo=getLogoDataURL();
+  var fechaStr=new Date().toLocaleDateString("es-AR")+" "+new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+  var userStr=currentUser?(currentUser.displayName||currentUser.email):"";
+  var instTotal=totalDerivAll(selP);
+  var allArr=derivAggInPeriods(selP);
+  var medCount=opts.ranking?allArr.length:selDocs.length;
+
+  var pages=[],toc=[],secNum=0;
+  function addSection(id,title,sub,bodyHtml){
+    secNum++;toc.push({num:secNum,title:title,page:pages.length+1,id:id});
+    pages.push('<div id="'+id+'"></div>'+secHead(secNum,title,sub)+bodyHtml);
+    return secNum;
+  }
+
+  /* ── Portada ── */
+  pages.push(
+    '<div style="position:absolute;inset:0;background:linear-gradient(150deg,#0d1f44 0%,#1a3a6b 55%,#27548f 100%);"></div>'+
+    '<div style="position:absolute;right:-40mm;top:-40mm;width:120mm;height:120mm;border-radius:50%;background:rgba(255,255,255,.05);"></div>'+
+    '<div style="position:absolute;right:-20mm;bottom:-50mm;width:140mm;height:140mm;border-radius:50%;background:rgba(255,255,255,.04);"></div>'+
+    '<div style="position:relative;padding:20mm 18mm;display:flex;flex-direction:column;min-height:296mm;">'+
+      (logo?'<div style="background:#fff;border-radius:16px;padding:8mm 10mm;width:fit-content;box-shadow:0 8px 30px rgba(0,0,0,.3);"><img src="'+logo+'" style="height:64px;display:block;"></div>':'<div style="font-size:24pt;font-weight:900;color:#fff;">CIMA</div>')+
+      '<div style="margin-top:auto;">'+
+        '<div style="font-size:9.5pt;color:#9fb6dd;text-transform:uppercase;letter-spacing:.28em;margin-bottom:7mm;">CIMA · Diagnóstico por Imágenes y Consultorios</div>'+
+        '<div style="font-size:36pt;font-weight:900;color:#fff;letter-spacing:-1.2px;line-height:1.04;">Informe de<br>Derivantes</div>'+
+        '<div style="font-size:13pt;color:#c8d8f2;margin-top:7mm;font-weight:650;">'+escHtml(rangeLabel)+'</div>'+
+        '<div style="display:flex;gap:8mm;margin-top:9mm;flex-wrap:wrap;">'+
+          '<div style="border-left:3px solid #5a8ad6;padding-left:4mm;"><div style="font-size:16pt;font-weight:900;color:#fff;">'+fmtN(instTotal)+'</div><div style="font-size:8pt;color:#9fb6dd;">derivaciones</div></div>'+
+          '<div style="border-left:3px solid #5a8ad6;padding-left:4mm;"><div style="font-size:16pt;font-weight:900;color:#fff;">'+fmtN(medCount)+'</div><div style="font-size:8pt;color:#9fb6dd;">'+(medCount===1?"médico":"médicos")+'</div></div>'+
+          '<div style="border-left:3px solid #5a8ad6;padding-left:4mm;"><div style="font-size:16pt;font-weight:900;color:#fff;">'+selP.length+'</div><div style="font-size:8pt;color:#9fb6dd;">'+(selP.length===1?"período":"períodos")+'</div></div>'+
+        '</div>'+
+        '<div style="margin-top:14mm;border-top:1px solid rgba(255,255,255,.25);padding-top:4mm;font-size:8pt;color:#9fb6dd;">Generado el '+escHtml(fechaStr)+(userStr?' · '+escHtml(userStr):'')+' · Control de Producción v'+APP_DISPLAY_VERSION+'</div>'+
+      '</div>'+
+    '</div>');
+  pages.push("__TOC__");
+
+  /* ── Ranking general ── */
+  if(opts.ranking){
+    var body="";
+    if(!allArr.length){
+      body='<div class="rpt-note">No hay datos de derivantes en los períodos seleccionados (la columna Médico-derivante no estaba mapeada al importar).</div>';
+    }else{
+      var top=allArr.slice(0,nRank);
+      body+='<div class="rpt-kpis">'+
+        kpiBox("Derivantes activos",String(allArr.length))+
+        kpiBox("Derivaciones totales",fmtN(instTotal))+
+        kpiBox("Top "+nRank+" concentra",fmtPct(instTotal?top.reduce(function(a,x){return a+x.c;},0)/instTotal:0))+
+        kpiBox("Principal",'<span style="font-size:10pt;">'+escHtml(top[0].n.length>22?top[0].n.substring(0,21)+"…":top[0].n)+'</span>')+
+        '</div>';
+      body+='<div class="rpt-h3">Top '+nRank+' médicos por derivaciones</div>';
+      var chartArr=top.slice(0,30);
+      body+=chartImg({type:"bar",data:{
+        labels:chartArr.map(function(x){return x.n.length>34?x.n.substring(0,33)+"…":x.n;}),
+        datasets:[{data:chartArr.map(function(x){return x.c;}),backgroundColor:"rgba(26,58,107,.85)",borderRadius:5,maxBarThickness:24}]},
+        options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:rptGrid(),y:{grid:{display:false},ticks:{color:"#334155",font:{size:10}}}}}},
+        900,Math.max(260,chartArr.length*30+80));
+      if(top.length>30)body+='<div class="rpt-note">El gráfico muestra los primeros 30 — la tabla incluye los '+top.length+' del top.</div>';
+      var acum=0;
+      var rows=top.map(function(x,i){acum+=x.c;return [String(i+1),escHtml(x.n),fmtN(x.c),fmtPct(instTotal?x.c/instTotal:0),fmtPct(instTotal?acum/instTotal:0)];});
+      var resto=instTotal-acum;
+      if(resto>0)rows.push(["",'<i>Otros ('+(allArr.length-top.length)+')</i>',fmtN(resto),fmtPct(instTotal?resto/instTotal:0),"100%"]);
+      body+=rptTable([{t:"#"},{t:"Médico derivante"},{t:"Derivaciones",r:1},{t:"%",r:1},{t:"% acumulado",r:1}],rows);
+    }
+    addSection("sec-rank","Ranking general de derivantes","Top "+nRank+" · "+rangeLabel,body);
+  }
+
+  /* ── Comparativa entre médicos elegidos ── */
+  if(opts.comparativa&&selDocs.length>1){
+    var comp=selDocs.map(function(name){
+      var k=normKey(name),tot=0;
+      selP.forEach(function(p){var d=_docs[p];if(d)(d.derivantes||[]).forEach(function(it){if(normKey(it.n)===k)tot+=it.c;});});
+      return {n:name,c:tot};
+    });
+    comp.sort(function(a,b){return b.c-a.c;});
+    var bodyC='<div class="rpt-h3">Derivaciones por médico (seleccionados)</div>';
+    bodyC+=chartImg({type:"bar",data:{
+      labels:comp.map(function(x){return x.n.length>34?x.n.substring(0,33)+"…":x.n;}),
+      datasets:[{data:comp.map(function(x){return x.c;}),backgroundColor:comp.map(function(x,i){return PALETTE[i%PALETTE.length];}),borderRadius:5,maxBarThickness:26}]},
+      options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:rptGrid(),y:{grid:{display:false},ticks:{color:"#334155",font:{size:10}}}}}},
+      900,Math.max(240,comp.length*32+80));
+    bodyC+=rptTable([{t:"Médico"},{t:"Derivaciones",r:1},{t:"% de la institución",r:1},{t:"Puesto",r:1}],
+      comp.map(function(x){var rp=derivRankPos(selP,normKey(x.n));return [escHtml(x.n),fmtN(x.c),fmtPct(instTotal?x.c/instTotal:0),rp.pos?("#"+rp.pos+" de "+rp.total):"—"];}));
+    addSection("sec-comp","Comparativa entre médicos","Seleccionados · "+rangeLabel,bodyC);
+  }
+
+  /* ── Ficha individual por médico ── */
+  if(opts.porMedico){
+    selDocs.forEach(function(name,di){
+      var k=normKey(name);
+      var byServ=derivByServ(selP,k);
+      var docTotal=0;byServ.forEach(function(x){docTotal+=x.c;});
+      var rp=derivRankPos(selP,k);
+      var body5='<div class="rpt-kpis">'+
+        kpiBox("Derivaciones totales",fmtN(docTotal))+
+        kpiBox("% de la institución",fmtPct(instTotal?docTotal/instTotal:0))+
+        kpiBox("Puesto en ranking",rp.pos?("#"+rp.pos+" de "+rp.total):"—")+
+        kpiBox("Servicios distintos",String(byServ.length))+
+        '</div>';
+      if(!docTotal){
+        body5+='<div class="rpt-note">Sin derivaciones registradas para este médico en los períodos seleccionados.</div>';
+      }else{
+        body5+='<div class="rpt-h3">Derivaciones por servicio</div>';
+        body5+=chartImg({type:"bar",data:{
+          labels:byServ.map(function(x){return x.n;}),
+          datasets:[{data:byServ.map(function(x){return x.c;}),backgroundColor:byServ.map(function(x,i){return PALETTE[i%PALETTE.length];}),borderRadius:6,maxBarThickness:46}]},
+          options:{plugins:{legend:{display:false}},scales:{x:rptGrid(),y:rptGrid()}}},900,300);
+        if(opts.evolucion&&selP.length>1){
+          body5+='<div class="rpt-h3">Evolución mensual</div>';
+          body5+=chartImg({type:"line",data:{labels:selP.map(periodShort),
+            datasets:[{data:derivMonthly(selP,k),borderColor:PALETTE[di%PALETTE.length],backgroundColor:"rgba(26,58,107,.08)",fill:true,tension:.35,pointRadius:4,pointBackgroundColor:PALETTE[di%PALETTE.length],borderWidth:2.5}]},
+            options:{plugins:{legend:{display:false}},scales:{x:rptGrid(),y:rptGrid()}}},900,250);
+        }
+        body5+=rptTable([{t:"Servicio"},{t:"Derivaciones",r:1},{t:"% del médico",r:1}],
+          byServ.map(function(x){return [escHtml(x.n),fmtN(x.c),fmtPct(docTotal?x.c/docTotal:0)];}));
+      }
+      addSection("sec-med-"+di,name,"Ficha de derivación · "+rangeLabel,body5);
+    });
+  }
+
+  if(!toc.length){
+    addSection("sec-empty","Sin contenido","",'<div class="rpt-note">No se seleccionó ningún contenido. Activá el ranking general o elegí al menos un médico con la ficha individual encendida.</div>');
+  }
+
+  /* ── Índice ── */
+  var tocHtml='<div class="rpt-sechead"><span class="rpt-secnum">§</span><div><div class="rpt-sectitle">Índice</div>'+
+    '<div class="rpt-secsub">'+escHtml(rangeLabel)+' · tocá cada sección para ir directo</div></div></div><div style="margin-top:6mm;">';
+  toc.forEach(function(t){
+    tocHtml+='<a href="#'+t.id+'" style="display:flex;align-items:baseline;gap:10px;text-decoration:none;color:#1c2430;margin-bottom:14px;">'+
+      '<span style="font-weight:900;color:#1a3a6b;min-width:26px;font-size:11pt;">'+t.num+'</span>'+
+      '<span style="font-weight:650;font-size:11pt;">'+escHtml(t.title)+'</span>'+
+      '<span style="flex:1;border-bottom:1.6px dotted #b9c7da;position:relative;top:-3px;"></span>'+
+      '<span style="font-weight:800;color:#1a3a6b;font-size:10pt;">'+t.page+'</span></a>';
+  });
+  tocHtml+='</div>';
+  pages[1]=tocHtml;
+
+  /* ── Ensamblado ── */
+  var totalPages=pages.length,html="";
+  pages.forEach(function(pg,i){
+    var isCover=i===0;
+    var foot=isCover?"":'<div class="rpt-foot"><span>CIMA · Informe de Derivantes — '+escHtml(rangeLabel)+'</span><span>Página '+(i+1)+' de '+totalPages+'</span></div>';
+    html+='<div class="rpt-page'+(isCover?' rpt-cover':'')+'">'+pg+foot+'</div>';
+  });
+  openReport(html,"Informe de Derivantes · "+rangeLabel);
 }
 
 function openReport(html,title){
